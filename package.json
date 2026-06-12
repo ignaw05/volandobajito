@@ -22,6 +22,7 @@
 	},
 	"dependencies": {
 		"@supabase/supabase-js": "^2.108.1",
+		"@vercel/functions": "^3.7.1",
 		"dotenv": "^16.4.5",
 		"grammy": "^1.43.0",
 		"zod": "^4.0.0"

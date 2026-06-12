@@ -67,6 +67,18 @@ Requiere un bot de Telegram de prueba y un canal de prueba en `.env` (`TELEGRAM_
 4. **Forzar expiración** — `SILENT_MODE=false npm run recheck` (⚠️ 1 llamada paga por deal publicado). Como la tarifa de prueba no existe en vivo, el verifier no la encuentra: el post del canal se edita con el banner `⚠️ EXPIRADO —` y el deal pasa a `expired`.
 5. **Limpieza** — borrar el deal de prueba: `delete from deals where airline = 'Test Air';`
 
+## Redirect con tracking (Fase 6)
+
+Los posts del canal linkean a `{REDIRECT_BASE_URL}/go/{dealId}`. Esa URL la sirve una función de Vercel (`api/go/[dealId].ts`): busca el deal, registra el click en `click_events` en segundo plano y responde `302` al `booking_url`. Deal inexistente, id malformado o deal sin `booking_url` → `404` de texto plano. `vercel.json` reescribe `/go/:dealId` → `/api/go/:dealId`.
+
+Despliegue:
+
+1. `npx vercel link` (o importar el repo desde el dashboard de Vercel; no hay framework, solo `api/`).
+2. Configurar en el proyecto de Vercel las env vars `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` (la función no necesita las demás).
+3. `npx vercel deploy --prod` y apuntar `REDIRECT_BASE_URL` (en `.env` y en los secrets de Actions) al dominio resultante, p. ej. `https://<proyecto>.vercel.app`.
+
+Prueba manual: con un deal publicado, abrir `{REDIRECT_BASE_URL}/go/{dealId}` → redirige al booking y aparece una fila en `click_events`; `{REDIRECT_BASE_URL}/go/cualquier-cosa` → 404.
+
 ## Estado de fases
 
 - [x] **Fase 0** — Setup: tooling, config zod fail-fast, `.env.example`
@@ -75,7 +87,7 @@ Requiere un bot de Telegram de prueba y un canal de prueba en `.env` (`TELEGRAM_
 - [x] **Fase 3** — Capa 2: detección estadística
 - [x] **Fase 4** — Capa 3: verificación en tiempo real
 - [x] **Fase 5** — Bot de curaduría + publicación
-- [ ] **Fase 6** — Redirect con tracking (Vercel)
+- [x] **Fase 6** — Redirect con tracking (Vercel)
 - [ ] **Fase 7** — Orquestación (GitHub Actions)
 
 ## Decisions
@@ -115,3 +127,9 @@ Requiere un bot de Telegram de prueba y un canal de prueba en `.env` (`TELEGRAM_
 - **Fase 5:** si la edición del post del canal falla, el deal igual pasa a `expired`: un banner desactualizado es recuperable, una tarifa muerta como `published` no.
 - **Fase 5:** `npm run recheck` es no-op con `SILENT_MODE=true` (modo prueba: el cron jamás gasta llamadas pagas) y comparte el presupuesto `MAX_VERIFICATIONS_PER_RUN` con verify.
 - **Fase 5:** el bot corre con la opción (A) del plan: proceso persistente long-polling en un host del operador (`npm run bot`). El pipeline no necesita el bot activo para notificar — `verify` envía la alerta vía sendMessage directo y los callbacks se procesan cuando el bot está corriendo.
+- **Fase 6:** la lógica vive en `src/redirect/redirect.ts` con deps inyectadas (mismo patrón que el resto); `api/go/[dealId].ts` es solo el adaptador de Vercel. Así los criterios de aceptación se prueban offline sin runtime de Vercel.
+- **Fase 6:** el insert del click se agenda con `waitUntil` de `@vercel/functions`, no con una promesa suelta — en serverless una promesa sin await puede morir cuando la respuesta sale. La respuesta no espera al insert (criterio de latencia) y un insert fallido solo se loguea.
+- **Fase 6:** un click de usuario nunca recibe `500`: id malformado (se valida formato uuid antes de tocar la DB), deal inexistente, deal sin `booking_url` o incluso lookup fallido (Supabase caída) responden `404`; el error se loguea. El único `500` posible es env mal configurado en Vercel.
+- **Fase 6:** el redirect funciona para cualquier deal existente sin importar su `status` — un post expirado conserva el link vivo; el banner ⚠️ EXPIRADO ya avisa que la tarifa murió.
+- **Fase 6:** la función usa `parseEnvSubset` (lanza `ConfigError`) en vez de `loadConfigSubset` (hace `process.exit`), que no corresponde en serverless. El cliente de Supabase se crea lazy y se reusa entre invocaciones warm.
+- **Fase 6:** sin `@vercel/node`: sus tipos arrastran ~117 paquetes con vulnerabilidades conocidas. El handler se tipa con `node:http` más una interfaz mínima para `req.query` (lo único no estándar que usa del runtime de Vercel).
