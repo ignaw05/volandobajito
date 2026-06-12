@@ -1,0 +1,27 @@
+{
+	"name": "flight-deals",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Detects anomalously low flight prices departing from Argentina, verifies them in real time, and publishes curated deals to a Telegram channel.",
+	"type": "module",
+	"engines": {
+		"node": ">=20"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"dotenv": "^16.4.5",
+		"zod": "^4.0.0"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.0.0",
+		"@types/node": "^22.0.0",
+		"tsx": "^4.19.0",
+		"typescript": "^5.6.0",
+		"vitest": "^3.0.0"
+	}
+}
