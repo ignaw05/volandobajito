@@ -38,4 +38,4 @@ jobs:
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
           REDIRECT_BASE_URL: ${{ secrets.REDIRECT_BASE_URL }}
           SILENT_MODE: ${{ secrets.SILENT_MODE || 'true' }}
-          AUTO_PUBLISH: "false"
+          AUTO_PUBLISH: ${{ secrets.AUTO_PUBLISH || 'false' }}

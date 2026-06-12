@@ -1,0 +1,21 @@
+name: fli-spike
+
+# Manual experiment only (see README): measures whether Google Flights'
+# internal API answers from Actions runner IPs before considering fli-js
+# as a verify provider. Not part of the pipeline.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/spike-fli.ts

@@ -379,8 +379,8 @@ npm run pipeline   # = scan → detect → verify (verify omitido si SILENT_MODE
 - Frontend web / landing / panel de administración (la curaduría es por Telegram).
 - Sistema de usuarios, suscripciones, pagos, Mercado Pago (fase de negocio posterior, no de esta validación).
 - Route-watching personalizado por usuario.
-- Publicación automática sin aprobación humana (existe `AUTO_PUBLISH` como env var reservada, default `false`, sin implementación detrás).
-- Scraping directo de Google Flights o uso de librerías de reverse engineering (fli u otras).
+- ~~Publicación automática sin aprobación humana (existe `AUTO_PUBLISH` como env var reservada, default `false`, sin implementación detrás).~~ **Re-incorporado por decisión del operador (2026-06-12):** `AUTO_PUBLISH=true` activa publicación automática con ventana de rechazo de 5 min, ejecutada por el bot de curaduría (ver README §Auto-publish). Default sigue `false`.
+- ~~Scraping directo de Google Flights o uso de librerías de reverse engineering (fli u otras).~~ **Relajado por decisión del operador (2026-06-12):** se evalúa `fli` (port `fli-js`) como proveedor de verificación para eliminar el costo de SearchApi. Por ahora solo un spike (`scripts/spike-fli.ts` + workflow `fli-spike`); la integración se decide con sus resultados (ver README §Spike fli).
 - Más de un canal de notificación (solo Telegram).
 - Optimizaciones prematuras: colas, Redis, microservicios. Es un monolito de scripts con cron y está bien que lo sea.
 

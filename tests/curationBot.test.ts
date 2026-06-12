@@ -69,6 +69,7 @@ function harness(options: {
 	dealsById?: Record<string, DealWithRoute>;
 	verifiedDeals?: DealWithRoute[];
 	stats?: FunnelStats;
+	inFlight?: Set<string>;
 }): Harness {
 	const apiCalls: Harness["apiCalls"] = [];
 	const transitions: Harness["transitions"] = [];
@@ -96,6 +97,7 @@ function harness(options: {
 			publishedDeals.push(d);
 		},
 		curatorChatId: CURATOR_CHAT_ID,
+		...(options.inFlight ? { inFlight: options.inFlight } : {}),
 		log: () => {},
 	};
 
@@ -183,6 +185,19 @@ describe("publish callback", () => {
 		expect(h.publishedDeals).toEqual([]);
 		const answer = h.apiCalls.find((c) => c.method === "answerCallbackQuery");
 		expect(answer?.payload.text).toContain("Ya resuelto");
+	});
+
+	it("does not double-publish while the auto-publish sweep holds the deal", async () => {
+		const h = harness({
+			dealsById: { "deal-1": deal() },
+			inFlight: new Set(["deal-1"]),
+		});
+		await h.bot.handleUpdate(
+			callbackUpdate(Number(CURATOR_CHAT_ID), "publish:deal-1"),
+		);
+		expect(h.publishedDeals).toEqual([]);
+		const answer = h.apiCalls.find((c) => c.method === "answerCallbackQuery");
+		expect(answer?.payload.text).toContain("Publicándose");
 	});
 
 	it("answers gracefully for a missing deal", async () => {

@@ -117,6 +117,20 @@ export interface CuratorAlertData {
 	isErrorFare: boolean;
 }
 
+/**
+ * Curator alert in auto-publish mode: the exact post that will go out,
+ * plus the countdown warning. The buttons short-circuit either way.
+ */
+export function formatAutoPublishAlert(
+	post: string,
+	graceMinutes: number,
+): string {
+	return (
+		`🔔 Deal verificado — así se publica en ~${graceMinutes} min salvo que lo rechaces:\n\n` +
+		post
+	);
+}
+
 /** The private message the curator gets when a deal is verified. */
 export function formatCuratorAlert(d: CuratorAlertData): string {
 	const lines = [

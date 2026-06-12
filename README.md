@@ -79,6 +79,24 @@ Despliegue:
 
 Prueba manual: con un deal publicado, abrir `{REDIRECT_BASE_URL}/go/{dealId}` → redirige al booking y aparece una fila en `click_events`; `{REDIRECT_BASE_URL}/go/cualquier-cosa` → 404.
 
+## Auto-publish (opcional, `AUTO_PUBLISH=true`)
+
+Con el flag activado (default `false` = flujo manual de siempre), un deal verificado se publica solo si el curador no lo rechaza a tiempo:
+
+- La alerta de Telegram muestra **el post exacto que va a salir** + "⏱ se publica en ~5 min salvo que lo rechaces", con los mismos botones (✅ publica ya, ❌ rechaza).
+- El barrido corre **dentro del bot** (`npm run bot`, cada 30 s): bot caído = no se publica nada — los deals quedan `verified` y se recuperan con `/pending`.
+- Cota de frescura: un deal verificado hace **más de 60 min no se auto-publica** (precio potencialmente vencido tras una caída del bot); queda para aprobación manual.
+- Activar: secret/env `AUTO_PUBLISH=true` tanto en Actions (cambia el formato de alerta de verify) como en el host del bot (activa el barrido). Requiere bot corriendo 24/7.
+
+## Spike fli (experimento, sin integrar)
+
+[`fli`](https://github.com/punitarani/fli) accede a la API interna de Google Flights por ingeniería inversa (gratis, sin key, MIT) — candidato a reemplazar SearchApi en verify y eliminar el único costo recurrente. Riesgos asumidos: no oficial (zona gris de ToS), puede romperse o ser bloqueado sin aviso, especialmente desde IPs de datacenter como las de los runners de Actions. El modo de falla es seguro: verify lanza error y nada se publica.
+
+- `vendor/fli-js-0.0.4.tgz`: el port TypeScript no está publicado en npm; se vendorea el tarball buildeado desde el repo (devDependency `file:`).
+- `npx tsx scripts/spike-fli.ts`: 5 rutas representativas one-way a +30 días; imprime precio mínimo/aerolínea/escalas por ruta. Local (2026-06-12): **5/5 OK** con ~100 opciones con precio por ruta.
+- Workflow `fli-spike` (solo manual): el mismo script desde un runner de Actions — la prueba decisiva. Correrlo 2–3 veces en horarios distintos.
+- Decisión pendiente de los resultados: si los runners pasan consistentemente → integrar como `VERIFIER_PROVIDER=fli` con SearchApi de fallback; si hay bloqueos → seguir con SearchApi (o evaluar proxy).
+
 ## Orquestación (Fase 7)
 
 Dos workflows de GitHub Actions, ambos en el grupo de concurrencia `pipeline` (`cancel-in-progress: false`): nunca corren dos a la vez porque comparten el proveedor de verificación y su presupuesto de llamadas pagas.
@@ -152,3 +170,7 @@ El bot de curaduría **no** corre en Actions. El pipeline le manda la alerta al 
 - **Fase 7:** los secrets sin setear llegan a Actions como `""` (no `undefined`), lo que rompería la validación zod; los knobs no sensibles llevan default inline en el workflow (`|| 'true'`, `|| '2'`, `|| 'searchapi'`). Resultado: un repo recién configurado corre silencioso por defecto.
 - **Fase 7:** `scan.yml` conserva su nombre de archivo (continuidad del historial de corridas) pero el workflow se muestra como `pipeline` en la UI de Actions.
 - **Fase 7:** el resumen "publicados" del criterio de aceptación sale del embudo de 24 h (`getFunnelStatsSince`, el mismo de `/stats`) — el pipeline no publica por sí mismo (curaduría humana), así que no hay contador propio de la corrida.
+- **Auto-publish:** vive en el bot y no en el pipeline de Actions, a pedido del operador: bot caído = no se publica nada (el modo de falla seguro). La alternativa (esperar 5 min en el job de Actions) publicaría aunque nadie pueda rechazar.
+- **Auto-publish:** la ventana (5 min), la cota de frescura (60 min) y el intervalo del barrido (30 s) son constantes en `src/curation/autoPublish.ts`, no env vars — menos knobs hasta que la práctica pida otra cosa.
+- **Auto-publish:** un `Set` de deal ids in-flight compartido entre el barrido y el botón ✅ evita el doble post; alcanza con memoria porque el bot es proceso único.
+- **Spike fli:** `fli-js` se vendorea como tarball commiteado (`vendor/`) porque el paquete no está en npm; pin exacto a 0.0.4 y build reproducible desde el clon.

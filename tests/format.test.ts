@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	type CuratorAlertData,
+	formatAutoPublishAlert,
 	formatCuratorAlert,
 	formatDateRange,
 	formatDealPost,
@@ -83,6 +84,14 @@ describe("formatExpiredPost", () => {
 		const expired = formatExpiredPost(formatDealPost(basePost));
 		expect(expired.startsWith("⚠️ EXPIRADO —")).toBe(true);
 		expect(expired).toMatchSnapshot();
+	});
+});
+
+describe("formatAutoPublishAlert", () => {
+	it("wraps the exact post with the countdown warning", () => {
+		const alert = formatAutoPublishAlert(formatDealPost(basePost), 5);
+		expect(alert).toContain("se publica en ~5 min");
+		expect(alert).toMatchSnapshot();
 	});
 });
 

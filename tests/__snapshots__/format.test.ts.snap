@@ -1,5 +1,20 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`formatAutoPublishAlert > wraps the exact post with the countdown warning 1`] = `
+"🔔 Deal verificado — así se publica en ~5 min salvo que lo rechaces:
+
+✈️ ¡GANGA! Buenos Aires → Madrid
+
+💵 USD 489 (≈ $733.500 dólar tarjeta)
+📉 38% más barato que lo habitual en esta ruta
+🛫 Iberia · Directo
+📅 Fechas: 12-28 de marzo
+
+👉 Ver vuelo: https://go.example.com/go/deal-uuid-1
+
+⚡ Las tarifas así suelen durar horas. Verificá el precio final antes de pagar."
+`;
+
 exports[`formatCuratorAlert > flags error fares in the header 1`] = `
 "🔔 Deal verificado: AEP → MAD · 🔥 TARIFA ERROR
 💵 caché USD 913 → en vivo USD 941

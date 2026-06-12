@@ -14,6 +14,11 @@ import {
 } from "../db/queries.js";
 import { formatCuratorAlert } from "../publish/format.js";
 import { publishDeal } from "../publish/publish.js";
+import {
+	AUTO_PUBLISH_GRACE_MS,
+	runAutoPublishSweep,
+	SWEEP_INTERVAL_MS,
+} from "./autoPublish.js";
 
 /**
  * Private curation bot (long-polling). Every verified deal lands here
@@ -38,6 +43,8 @@ export interface CurationBotDeps {
 	/** Publishes an approved deal to the public channel (Fase 5 publisher). */
 	publishDeal(deal: DealWithRoute): Promise<void>;
 	curatorChatId: string;
+	/** Shared with the auto-publish sweep so ✅ and the timer never race. */
+	inFlight?: Set<string>;
 	now?: () => number;
 	log?: (line: string) => void;
 }
@@ -69,6 +76,7 @@ export function registerCurationHandlers(
 ): void {
 	const log = deps.log ?? console.log;
 	const now = deps.now ?? Date.now;
+	const inFlight = deps.inFlight ?? new Set<string>();
 
 	// Hard gate: only the curator's chat exists. Anyone else is ignored
 	// silently — no reply, no log line an attacker could probe with.
@@ -109,7 +117,16 @@ export function registerCurationHandlers(
 			});
 			return;
 		}
-		await deps.publishDeal(deal);
+		if (inFlight.has(deal.id)) {
+			await ctx.answerCallbackQuery({ text: "Publicándose…" });
+			return;
+		}
+		inFlight.add(deal.id);
+		try {
+			await deps.publishDeal(deal);
+		} finally {
+			inFlight.delete(deal.id);
+		}
 		log(
 			`curation: published ${deal.routes.origin}-${deal.routes.destination} (${deal.id})`,
 		);
@@ -188,31 +205,61 @@ async function main(): Promise<void> {
 		"CURATOR_CHAT_ID",
 		"CHANNEL_ID",
 		"REDIRECT_BASE_URL",
+		"AUTO_PUBLISH",
 	);
 	const db = createDb(
 		createSupabase(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY),
 	);
 	const dolar = createDolarClient();
 	const bot = new Bot(config.TELEGRAM_BOT_TOKEN);
+	const inFlight = new Set<string>();
+
+	const publishToChannel = async (deal: DealWithRoute): Promise<void> => {
+		await publishDeal(
+			{
+				db,
+				sendToChannel: async (text) => {
+					const message = await bot.api.sendMessage(config.CHANNEL_ID, text);
+					return message.message_id;
+				},
+				getArsRate: () => dolar.getTarjetaRate(),
+				redirectBaseUrl: config.REDIRECT_BASE_URL,
+			},
+			deal,
+		);
+	};
 
 	registerCurationHandlers(bot, {
 		db,
 		curatorChatId: config.CURATOR_CHAT_ID,
-		publishDeal: async (deal) => {
-			await publishDeal(
-				{
-					db,
-					sendToChannel: async (text) => {
-						const message = await bot.api.sendMessage(config.CHANNEL_ID, text);
-						return message.message_id;
-					},
-					getArsRate: () => dolar.getTarjetaRate(),
-					redirectBaseUrl: config.REDIRECT_BASE_URL,
-				},
-				deal,
-			);
-		},
+		inFlight,
+		publishDeal: publishToChannel,
 	});
+
+	if (config.AUTO_PUBLISH) {
+		let sweeping = false;
+		setInterval(async () => {
+			if (sweeping) return;
+			sweeping = true;
+			try {
+				await runAutoPublishSweep({
+					db,
+					publishDeal: publishToChannel,
+					inFlight,
+					notifyCurator: async (text) => {
+						await bot.api.sendMessage(config.CURATOR_CHAT_ID, text);
+					},
+				});
+			} catch (error) {
+				console.log(`auto-publish: sweep failed: ${String(error)}`);
+			} finally {
+				sweeping = false;
+			}
+		}, SWEEP_INTERVAL_MS);
+		console.log(
+			`curation bot: AUTO_PUBLISH=true — unrejected deals go out after ${AUTO_PUBLISH_GRACE_MS / 60_000} min`,
+		);
+	}
 
 	console.log("curation bot: starting long-polling");
 	await bot.start();

@@ -1,4 +1,5 @@
 import { pathToFileURL } from "node:url";
+import { createDolarClient } from "../clients/dolar.js";
 import {
 	createVerifier,
 	type FlightVerifier,
@@ -6,6 +7,7 @@ import {
 } from "../clients/flightVerifier.js";
 import { createTelegramClient } from "../clients/telegram.js";
 import { loadConfigSubset } from "../config.js";
+import { AUTO_PUBLISH_GRACE_MS } from "../curation/autoPublish.js";
 import {
 	type CandidateWithRoute,
 	createDb,
@@ -14,7 +16,11 @@ import {
 	type DealPatch,
 	type DealStatus,
 } from "../db/queries.js";
-import { formatCuratorAlert } from "../publish/format.js";
+import {
+	formatAutoPublishAlert,
+	formatCuratorAlert,
+	formatDealPost,
+} from "../publish/format.js";
 
 /**
  * The layer-1 cache is always somewhat stale; a live price up to 15%
@@ -164,6 +170,8 @@ export async function main(): Promise<void> {
 		"MAX_VERIFICATIONS_PER_RUN",
 		"TELEGRAM_BOT_TOKEN",
 		"CURATOR_CHAT_ID",
+		"REDIRECT_BASE_URL",
+		"AUTO_PUBLISH",
 	);
 	const db = createDb(
 		createSupabase(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY),
@@ -173,6 +181,44 @@ export async function main(): Promise<void> {
 		...(config.FLIGHTAPI_KEY ? { flightApiKey: config.FLIGHTAPI_KEY } : {}),
 	});
 	const telegram = createTelegramClient(config.TELEGRAM_BOT_TOKEN);
+	const dolar = createDolarClient();
+
+	// In auto-publish mode the curator sees the exact post that will go
+	// out (plus the countdown); otherwise the classic data alert.
+	const alertText = async (deal: CandidateWithRoute): Promise<string> => {
+		if (config.AUTO_PUBLISH) {
+			const post = formatDealPost({
+				dealId: deal.id,
+				origin: deal.routes.origin,
+				destination: deal.routes.destination,
+				priceUsd: deal.verified_price_usd as number,
+				arsRate: await dolar.getTarjetaRate(),
+				discountPct: deal.discount_pct,
+				airline: deal.airline,
+				direct: deal.direct,
+				departDate: deal.depart_date,
+				returnDate: deal.return_date,
+				isErrorFare: deal.is_error_fare,
+				redirectBaseUrl: config.REDIRECT_BASE_URL,
+			});
+			return formatAutoPublishAlert(post, AUTO_PUBLISH_GRACE_MS / 60_000);
+		}
+		return formatCuratorAlert({
+			origin: deal.routes.origin,
+			destination: deal.routes.destination,
+			cachedPriceUsd: deal.cached_price_usd,
+			verifiedPriceUsd: deal.verified_price_usd as number,
+			medianAtDetection: deal.median_at_detection,
+			discountPct: deal.discount_pct,
+			airline: deal.airline,
+			direct: deal.direct,
+			departDate: deal.depart_date,
+			returnDate: deal.return_date,
+			score: deal.score,
+			isErrorFare: deal.is_error_fare,
+		});
+	};
+
 	const summary = await runVerify({
 		db,
 		verifier,
@@ -180,20 +226,7 @@ export async function main(): Promise<void> {
 		notifyCurator: async (deal) => {
 			await telegram.sendWithApprovalButtons(
 				config.CURATOR_CHAT_ID,
-				formatCuratorAlert({
-					origin: deal.routes.origin,
-					destination: deal.routes.destination,
-					cachedPriceUsd: deal.cached_price_usd,
-					verifiedPriceUsd: deal.verified_price_usd as number,
-					medianAtDetection: deal.median_at_detection,
-					discountPct: deal.discount_pct,
-					airline: deal.airline,
-					direct: deal.direct,
-					departDate: deal.depart_date,
-					returnDate: deal.return_date,
-					score: deal.score,
-					isErrorFare: deal.is_error_fare,
-				}),
+				await alertText(deal),
 				deal.id,
 			);
 		},
