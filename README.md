@@ -37,7 +37,8 @@ Alternativa al SQL de seed: `npm run seed-routes` upsertea las mismas rutas vía
 | `npm run lint` / `lint:fix` | Biome (lint + format) | ✅ 0 |
 | `npm test` | Vitest | ✅ 0 |
 | `npm run seed-routes` | Pobla la tabla `routes` (480 rutas; `-- --sql` imprime el SQL) | ✅ 1 |
-| `npm run scan` | Capa 1: barrido Travelpayouts → `price_history` | 2 |
+| `npm run scan` | Capa 1: barrido Travelpayouts → `price_history` | ✅ 2 |
+| `npm run bootstrap-baseline` | Opcional: siembra baseline vía SerpApi (omite si no hay `SERPAPI_KEY`) | ✅ 2 |
 | `npm run detect` | Capa 2: refresh de stats + detección de candidatos | 3 |
 | `npm run verify` | Capa 3: verificación real-time de candidatos | 4 |
 | `npm run pipeline` | scan → detect → verify (verify omitido si `SILENT_MODE=true`) | 4 |
@@ -50,7 +51,7 @@ Los comandos de fases futuras se agregan a `package.json` cuando su fase se impl
 
 - [x] **Fase 0** — Setup: tooling, config zod fail-fast, `.env.example`
 - [x] **Fase 1** — Schema de base de datos + seed de rutas
-- [ ] **Fase 2** — Capa 1: scanner (Travelpayouts)
+- [x] **Fase 2** — Capa 1: scanner (Travelpayouts)
 - [ ] **Fase 3** — Capa 2: detección estadística
 - [ ] **Fase 4** — Capa 3: verificación en tiempo real
 - [ ] **Fase 5** — Bot de curaduría + publicación
@@ -68,3 +69,10 @@ Los comandos de fases futuras se agregan a `package.json` cuando su fase se impl
 - **Fase 1:** `002_route_seed.sql` se genera desde `src/db/routeSeed.ts` (única fuente de verdad) para evitar drift entre el SQL y el script de seed.
 - **Fase 1:** `loadConfigSubset(...)` permite que scripts standalone (como el seed) validen solo las env vars que usan, manteniendo fail-fast; el pipeline completo seguirá usando `loadConfig()`.
 - **Fase 1:** los tests de `db/queries.ts` usan mocks finos del builder de supabase-js (no hay Postgres local garantizado en el entorno de dev).
+- **Fase 1 (cierre):** las migraciones `001` y `002` se aplicaron al proyecto Supabase `BotVuelos` vía el MCP de Supabase (`apply_migration`), quedando registradas en el historial de migraciones del proyecto. Verificado: 480 rutas activas sin duplicados.
+- **Fase 2:** el barrido mensual cubre el mes corriente + 3 siguientes (4 requests por ruta).
+- **Fase 2:** `direct` se considera `true` solo si ida **y** vuelta son sin escalas (`transfers=0` y `return_transfers` 0 o ausente); `null` cuando la API no informa escalas.
+- **Fase 2:** entradas individuales malformadas en la respuesta se descartan sin abortar el barrido; un envelope inesperado o `success=false` sí es error (y reintenta a nivel request).
+- **Fase 2:** el rate limiter espacia requests en serie (1 cada 200 ms = 300 req/min); ante 429 duerme según `X-Rate-Limit-Reset` (epoch o delta, acotado a 90 s) y ante `X-Rate-Limit-Remaining: 0` pausa proactivamente.
+- **Fase 2:** `npm run scan` valida solo las env vars que usa (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TRAVELPAYOUTS_TOKEN`) vía `loadConfigSubset`, igual que el seed; el orquestador de Fase 7 usará `loadConfig()` completo.
+- **Fase 2:** "las 60 rutas principales" del bootstrap = las primeras 60 rutas activas con origen EZE (aeropuerto internacional principal), en orden de seed.

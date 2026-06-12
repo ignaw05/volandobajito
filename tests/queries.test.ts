@@ -50,6 +50,7 @@ function createSupabaseStub(results: StubResult[] = [{ data: null }]) {
 					return builder;
 				};
 			}
+			// biome-ignore lint/suspicious/noThenProperty: the stub mimics supabase-js's thenable query builder on purpose
 			builder.then = (
 				resolve: (value: unknown) => unknown,
 				reject: (reason: unknown) => unknown,

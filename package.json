@@ -12,7 +12,9 @@
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
 		"test": "vitest run",
-		"seed-routes": "tsx scripts/seed-routes.ts"
+		"seed-routes": "tsx scripts/seed-routes.ts",
+		"scan": "tsx src/pipeline/scan.ts",
+		"bootstrap-baseline": "tsx scripts/bootstrap-baseline.ts"
 	},
 	"dependencies": {
 		"@supabase/supabase-js": "^2.108.1",

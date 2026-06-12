@@ -1,0 +1,61 @@
+{
+	"success": true,
+	"data": [
+		{
+			"origin": "EZE",
+			"destination": "MAD",
+			"origin_airport": "EZE",
+			"destination_airport": "MAD",
+			"price": 689,
+			"airline": "IB",
+			"flight_number": "6842",
+			"departure_at": "2026-07-12T13:55:00-03:00",
+			"return_at": "2026-07-28T11:40:00+02:00",
+			"transfers": 0,
+			"return_transfers": 0,
+			"duration": 1450,
+			"duration_to": 725,
+			"duration_back": 725,
+			"link": "/search/EZE1207MAD2807?t=IB1752324900001753695600000026890"
+		},
+		{
+			"origin": "EZE",
+			"destination": "MAD",
+			"origin_airport": "EZE",
+			"destination_airport": "MAD",
+			"price": 712,
+			"airline": "UX",
+			"flight_number": "42",
+			"departure_at": "2026-07-19T23:55:00-03:00",
+			"return_at": "2026-08-02T12:05:00+02:00",
+			"transfers": 1,
+			"return_transfers": 0,
+			"duration": 1730,
+			"duration_to": 880,
+			"duration_back": 850,
+			"link": "/search/EZE1907MAD0208?t=UX1752976500001754129100000027120"
+		},
+		{
+			"origin": "EZE",
+			"destination": "MAD",
+			"origin_airport": "EZE",
+			"destination_airport": "MAD",
+			"price": 645,
+			"airline": "AR",
+			"flight_number": "1132",
+			"departure_at": "2026-07-05T12:25:00-03:00",
+			"transfers": 0,
+			"duration": 725,
+			"duration_to": 725,
+			"link": "/search/EZE0507MAD?t=AR1751721900000000725000006450"
+		},
+		{
+			"origin": "EZE",
+			"destination": "MAD",
+			"airline": "LA",
+			"departure_at": "2026-07-22T08:10:00-03:00",
+			"transfers": 1
+		}
+	],
+	"currency": "usd"
+}
