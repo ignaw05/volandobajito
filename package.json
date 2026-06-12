@@ -11,9 +11,11 @@
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
-		"test": "vitest run"
+		"test": "vitest run",
+		"seed-routes": "tsx scripts/seed-routes.ts"
 	},
 	"dependencies": {
+		"@supabase/supabase-js": "^2.108.1",
 		"dotenv": "^16.4.5",
 		"zod": "^4.0.0"
 	},

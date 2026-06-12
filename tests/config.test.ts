@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ConfigError, parseEnv } from "../src/config.js";
+import { ConfigError, parseEnv, parseEnvSubset } from "../src/config.js";
 
 const validEnv: Record<string, string> = {
 	SUPABASE_URL: "https://example.supabase.co",
@@ -69,5 +69,24 @@ describe("parseEnv", () => {
 		expect(() => parseEnv({ ...validEnv, SILENT_MODE: "yes" })).toThrowError(
 			/SILENT_MODE/,
 		);
+	});
+});
+
+describe("parseEnvSubset", () => {
+	it("validates only the requested variables", () => {
+		const config = parseEnvSubset(
+			["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
+			{
+				SUPABASE_URL: "https://example.supabase.co",
+				SUPABASE_SERVICE_ROLE_KEY: "key",
+			},
+		);
+		expect(config.SUPABASE_URL).toBe("https://example.supabase.co");
+	});
+
+	it("still names missing variables within the subset", () => {
+		expect(() =>
+			parseEnvSubset(["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"], {}),
+		).toThrowError(/SUPABASE_SERVICE_ROLE_KEY/);
 	});
 });
