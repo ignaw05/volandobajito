@@ -1,17 +1,18 @@
-name: pipeline
+name: recheck
 
 on:
   schedule:
-    - cron: "0 */8 * * *"
+    - cron: "0 */12 * * *"
   workflow_dispatch:
 
-# Single group shared with recheck.yml: never two paid-capable runs at once.
+# Same group as scan.yml: recheck never overlaps a pipeline run (they share
+# the verification provider and its paid-call budget).
 concurrency:
   group: pipeline
   cancel-in-progress: false
 
 jobs:
-  pipeline:
+  recheck:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -21,21 +22,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Unset secrets arrive as "" (not undefined), which would fail zod
-      # validation — hence the inline defaults on the non-secret knobs.
-      # Verify/telegram secrets are only validated when SILENT_MODE=false.
-      - run: npm run pipeline
+      # No-op while SILENT_MODE=true; the rest of the env is only validated
+      # once the operator flips it to false.
+      - run: npm run recheck
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
           VERIFIER_PROVIDER: ${{ secrets.VERIFIER_PROVIDER || 'searchapi' }}
           SEARCHAPI_KEY: ${{ secrets.SEARCHAPI_KEY }}
           FLIGHTAPI_KEY: ${{ secrets.FLIGHTAPI_KEY }}
           MAX_VERIFICATIONS_PER_RUN: ${{ secrets.MAX_VERIFICATIONS_PER_RUN || '2' }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          CURATOR_CHAT_ID: ${{ secrets.CURATOR_CHAT_ID }}
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
           REDIRECT_BASE_URL: ${{ secrets.REDIRECT_BASE_URL }}
           SILENT_MODE: ${{ secrets.SILENT_MODE || 'true' }}
-          AUTO_PUBLISH: "false"

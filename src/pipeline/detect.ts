@@ -218,7 +218,7 @@ export async function runDetect(deps: DetectDeps): Promise<DetectSummary> {
 	return summary;
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
 	const config = loadConfigSubset("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY");
 	const db = createDb(
 		createSupabase(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY),

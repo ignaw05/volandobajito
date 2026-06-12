@@ -7,3 +7,5 @@ coverage/
 .DS_Store
 .vercel/
 .claude/settings.local.json
+.vercel
+.env*

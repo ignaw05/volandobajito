@@ -154,7 +154,7 @@ export async function runVerify(deps: VerifyDeps): Promise<VerifySummary> {
 	return summary;
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
 	const config = loadConfigSubset(
 		"SUPABASE_URL",
 		"SUPABASE_SERVICE_ROLE_KEY",

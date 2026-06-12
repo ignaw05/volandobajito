@@ -16,6 +16,7 @@
 		"scan": "tsx src/pipeline/scan.ts",
 		"detect": "tsx src/pipeline/detect.ts",
 		"verify": "tsx src/pipeline/verify.ts",
+		"pipeline": "tsx src/pipeline/run.ts",
 		"recheck": "tsx src/pipeline/recheck.ts",
 		"bot": "tsx src/curation/bot.ts",
 		"bootstrap-baseline": "tsx scripts/bootstrap-baseline.ts"
