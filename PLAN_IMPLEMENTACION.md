@@ -290,6 +290,13 @@ Implementación primaria: **SearchApi.io** (`engine=google_flights`, params `dep
 - El costo por corrida está acotado por `MAX_VERIFICATIONS_PER_RUN` — verificable en logs (contador de llamadas pagas por corrida).
 - Si la API paga falla por completo (caída/sin créditos), el pipeline no publica nada y lo loguea como error visible. **Nunca degradar a publicar precios de caché.**
 
+**Modo prueba sin costo (vigente hasta decidir pagar):**
+- Presupuestos free tier: SearchApi 100 req/mes, SerpApi 250 req/mes. El diseño original (15 verificaciones × 2-3 corridas/día) agotaría SearchApi en un día.
+- `SILENT_MODE=true` permanece activo: el cron **nunca** llama APIs pagas (ni verify ni recheck). La verificación se dispara solo manualmente (`npm run verify`).
+- `MAX_VERIFICATIONS_PER_RUN=2` durante la prueba (era 15). Cada corrida manual loguea llamadas usadas para llevar la cuenta mensual a ojo.
+- El re-chequeo de deals publicados (Fase 5) queda deshabilitado mientras dure el modo prueba — no hay deals publicados aún y consume presupuesto de verificación.
+- Salida del modo prueba: cuando el embudo valide (confirma ≥30% de lo verificado), pasar a plan pago de SearchApi y restaurar `MAX_VERIFICATIONS_PER_RUN=15`.
+
 ---
 
 ### Fase 5 — Bot de curaduría + publicación
@@ -391,7 +398,7 @@ TRAVELPAYOUTS_TOKEN=
 VERIFIER_PROVIDER=searchapi       # searchapi | flightapi
 SEARCHAPI_KEY=
 FLIGHTAPI_KEY=                    # opcional
-MAX_VERIFICATIONS_PER_RUN=15
+MAX_VERIFICATIONS_PER_RUN=2       # 15 en producción paga; 2 en modo prueba free tier
 
 # Bootstrap opcional del baseline
 SERPAPI_KEY=                      # opcional

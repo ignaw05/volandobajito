@@ -40,7 +40,7 @@ Alternativa al SQL de seed: `npm run seed-routes` upsertea las mismas rutas vía
 | `npm run scan` | Capa 1: barrido Travelpayouts → `price_history` | ✅ 2 |
 | `npm run bootstrap-baseline` | Opcional: siembra baseline vía SerpApi (omite si no hay `SERPAPI_KEY`) | ✅ 2 |
 | `npm run detect` | Capa 2: refresh de stats + detección de candidatos | ✅ 3 |
-| `npm run verify` | Capa 3: verificación real-time de candidatos | 4 |
+| `npm run verify` | Capa 3: verificación real-time de candidatos (⚠️ gasta cuota paga) | ✅ 4 |
 | `npm run pipeline` | scan → detect → verify (verify omitido si `SILENT_MODE=true`) | 4 |
 | `npm run recheck` | Re-verificación de deals publicados (< 72 h) | 5 |
 | `npm run bot` | Bot de curaduría (long-polling, proceso persistente) | 5 |
@@ -53,7 +53,7 @@ Los comandos de fases futuras se agregan a `package.json` cuando su fase se impl
 - [x] **Fase 1** — Schema de base de datos + seed de rutas
 - [x] **Fase 2** — Capa 1: scanner (Travelpayouts)
 - [x] **Fase 3** — Capa 2: detección estadística
-- [ ] **Fase 4** — Capa 3: verificación en tiempo real
+- [x] **Fase 4** — Capa 3: verificación en tiempo real
 - [ ] **Fase 5** — Bot de curaduría + publicación
 - [ ] **Fase 6** — Redirect con tracking (Vercel)
 - [ ] **Fase 7** — Orquestación (GitHub Actions)
@@ -83,3 +83,8 @@ Los comandos de fases futuras se agregan a `package.json` cuando su fase se impl
 - **Fase 3:** `is_error_fare` requiere estadística usable (≥25 muestras); un precio bajo el umbral absoluto sin muestra suficiente es candidato pero nunca error fare (sin mediana confiable no hay "50% de la mediana").
 - **Fase 3:** `region_weight` para `other` = 0 (el plan no lo define).
 - **Fase 3:** `getRecentObservations` pagina de a 1000 filas — PostgREST capea las respuestas y un barrido completo inserta ~2000 (bug encontrado en el smoke test real: evaluaba solo las primeras 1000).
+- **Fase 4 (modo prueba sin costo):** free tiers — SearchApi 100 req/mes, SerpApi 250 req/mes. `MAX_VERIFICATIONS_PER_RUN=2`, `SILENT_MODE=true` (el cron jamás llama APIs pagas) y `npm run verify` solo se corre a mano. Ver §Fase 4 del plan.
+- **Fase 4:** SearchApi reporta "sin resultados" como **HTTP 200 + campo `error`** (descubierto en vivo). Ese caso es `alive=false` → `rejected`; cualquier otro string de error con 200 lanza excepción y el deal queda `candidate` (nunca rechazar por un fallo del proveedor).
+- **Fase 4:** los candidatos se verifican ordenados por `is_error_fare desc, score desc` — las tarifas error tienen prioridad máxima de cola, como pide la Fase 3.
+- **Fase 4:** sin `return_date` la búsqueda lleva `flight_type=one_way`; el `booking_url` usa el deep link del proveedor si viene, si no el formato `google.com/travel/flights?q=...`.
+- **Fase 4:** hallazgo operativo: deals originados en low-cost (JetSmart) pueden no ser armables como ida+vuelta en Google Flights → `price_gone`. Si la tasa de confirmación da muy baja por esto, considerar verificar tramos one-way por separado (decisión futura, no implementado).

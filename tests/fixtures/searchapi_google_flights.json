@@ -1,0 +1,151 @@
+{
+	"search_metadata": {
+		"id": "search_qwerty123",
+		"status": "Success",
+		"created_at": "2026-06-12T15:00:00Z",
+		"request_url": "https://www.google.com/travel/flights?hl=en&curr=USD",
+		"google_flights_url": "https://www.google.com/travel/flights?tfs=CBwQAhopEgoyMDI2LTA4LTE5",
+		"total_time_taken": 2.05
+	},
+	"search_parameters": {
+		"engine": "google_flights",
+		"departure_id": "AEP",
+		"arrival_id": "MAD",
+		"outbound_date": "2026-08-19",
+		"return_date": "2026-09-08",
+		"currency": "USD"
+	},
+	"best_flights": [
+		{
+			"flights": [
+				{
+					"departure_airport": {
+						"name": "Jorge Newbery Airfield",
+						"id": "AEP",
+						"time": "2026-08-19 13:30"
+					},
+					"arrival_airport": {
+						"name": "Adolfo Suárez Madrid–Barajas Airport",
+						"id": "MAD",
+						"time": "2026-08-20 06:05"
+					},
+					"duration": 755,
+					"airplane": "Boeing 787",
+					"airline": "Iberia",
+					"airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/IB.png",
+					"flight_number": "IB 6842",
+					"travel_class": "Economy",
+					"legroom": "31 in"
+				}
+			],
+			"layovers": [],
+			"total_duration": 755,
+			"carbon_emissions": {
+				"this_flight": 619000,
+				"typical_for_this_route": 631000
+			},
+			"price": 968,
+			"type": "Round trip",
+			"airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/IB.png"
+		},
+		{
+			"flights": [
+				{
+					"departure_airport": {
+						"name": "Jorge Newbery Airfield",
+						"id": "AEP",
+						"time": "2026-08-19 20:15"
+					},
+					"arrival_airport": {
+						"name": "São Paulo/Guarulhos International Airport",
+						"id": "GRU",
+						"time": "2026-08-19 23:05"
+					},
+					"duration": 170,
+					"airline": "LATAM",
+					"flight_number": "LA 8011",
+					"travel_class": "Economy"
+				},
+				{
+					"departure_airport": {
+						"name": "São Paulo/Guarulhos International Airport",
+						"id": "GRU",
+						"time": "2026-08-20 01:25"
+					},
+					"arrival_airport": {
+						"name": "Adolfo Suárez Madrid–Barajas Airport",
+						"id": "MAD",
+						"time": "2026-08-20 17:50"
+					},
+					"duration": 625,
+					"airline": "LATAM",
+					"flight_number": "LA 8064",
+					"travel_class": "Economy"
+				}
+			],
+			"layovers": [
+				{
+					"duration": 140,
+					"name": "São Paulo/Guarulhos International Airport",
+					"id": "GRU"
+				}
+			],
+			"total_duration": 935,
+			"price": 941,
+			"type": "Round trip"
+		}
+	],
+	"other_flights": [
+		{
+			"flights": [
+				{
+					"departure_airport": {
+						"name": "Jorge Newbery Airfield",
+						"id": "AEP",
+						"time": "2026-08-19 09:40"
+					},
+					"arrival_airport": {
+						"name": "El Dorado International Airport",
+						"id": "BOG",
+						"time": "2026-08-19 15:55"
+					},
+					"duration": 375,
+					"airline": "Avianca",
+					"flight_number": "AV 086",
+					"travel_class": "Economy"
+				},
+				{
+					"departure_airport": {
+						"name": "El Dorado International Airport",
+						"id": "BOG",
+						"time": "2026-08-19 19:55"
+					},
+					"arrival_airport": {
+						"name": "Adolfo Suárez Madrid–Barajas Airport",
+						"id": "MAD",
+						"time": "2026-08-20 12:35"
+					},
+					"duration": 580,
+					"airline": "Avianca",
+					"flight_number": "AV 010",
+					"travel_class": "Economy"
+				}
+			],
+			"layovers": [
+				{
+					"duration": 240,
+					"name": "El Dorado International Airport",
+					"id": "BOG"
+				}
+			],
+			"total_duration": 1195,
+			"price": 1024,
+			"type": "Round trip"
+		}
+	],
+	"price_insights": {
+		"lowest_price": 941,
+		"price_level": "low",
+		"typical_price_range": [1100, 1750]
+	}
+}

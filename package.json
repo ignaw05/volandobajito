@@ -15,6 +15,7 @@
 		"seed-routes": "tsx scripts/seed-routes.ts",
 		"scan": "tsx src/pipeline/scan.ts",
 		"detect": "tsx src/pipeline/detect.ts",
+		"verify": "tsx src/pipeline/verify.ts",
 		"bootstrap-baseline": "tsx scripts/bootstrap-baseline.ts"
 	},
 	"dependencies": {

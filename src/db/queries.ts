@@ -75,6 +75,11 @@ export interface Deal extends NewDeal {
 	rejection_reason: string | null;
 }
 
+/** Deal plus the embedded route, as returned by getTopCandidates. */
+export interface CandidateWithRoute extends Deal {
+	routes: { origin: string; destination: string };
+}
+
 /** Mutable deal fields that may accompany a status transition. */
 export interface DealPatch {
 	verified_price_usd?: number;
@@ -246,6 +251,21 @@ export function createDb(supabase: SupabaseClient) {
 				.select()
 				.single();
 			return unwrap(result, `transitionDeal(${id} -> ${status})`);
+		},
+
+		/**
+		 * Pending candidates for paid verification, error fares first, then
+		 * by score. The limit is the per-run cost cap.
+		 */
+		async getTopCandidates(limit: number): Promise<CandidateWithRoute[]> {
+			const result = await supabase
+				.from("deals")
+				.select("*, routes(origin, destination)")
+				.eq("status", "candidate")
+				.order("is_error_fare", { ascending: false })
+				.order("score", { ascending: false })
+				.limit(limit);
+			return unwrap(result, "getTopCandidates") ?? [];
 		},
 
 		async getDealsByStatus(status: DealStatus): Promise<Deal[]> {
