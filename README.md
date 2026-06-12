@@ -39,7 +39,7 @@ Alternativa al SQL de seed: `npm run seed-routes` upsertea las mismas rutas vía
 | `npm run seed-routes` | Pobla la tabla `routes` (480 rutas; `-- --sql` imprime el SQL) | ✅ 1 |
 | `npm run scan` | Capa 1: barrido Travelpayouts → `price_history` | ✅ 2 |
 | `npm run bootstrap-baseline` | Opcional: siembra baseline vía SerpApi (omite si no hay `SERPAPI_KEY`) | ✅ 2 |
-| `npm run detect` | Capa 2: refresh de stats + detección de candidatos | 3 |
+| `npm run detect` | Capa 2: refresh de stats + detección de candidatos | ✅ 3 |
 | `npm run verify` | Capa 3: verificación real-time de candidatos | 4 |
 | `npm run pipeline` | scan → detect → verify (verify omitido si `SILENT_MODE=true`) | 4 |
 | `npm run recheck` | Re-verificación de deals publicados (< 72 h) | 5 |
@@ -52,7 +52,7 @@ Los comandos de fases futuras se agregan a `package.json` cuando su fase se impl
 - [x] **Fase 0** — Setup: tooling, config zod fail-fast, `.env.example`
 - [x] **Fase 1** — Schema de base de datos + seed de rutas
 - [x] **Fase 2** — Capa 1: scanner (Travelpayouts)
-- [ ] **Fase 3** — Capa 2: detección estadística
+- [x] **Fase 3** — Capa 2: detección estadística
 - [ ] **Fase 4** — Capa 3: verificación en tiempo real
 - [ ] **Fase 5** — Bot de curaduría + publicación
 - [ ] **Fase 6** — Redirect con tracking (Vercel)
@@ -76,3 +76,10 @@ Los comandos de fases futuras se agregan a `package.json` cuando su fase se impl
 - **Fase 2:** el rate limiter espacia requests en serie (1 cada 200 ms = 300 req/min); ante 429 duerme según `X-Rate-Limit-Reset` (epoch o delta, acotado a 90 s) y ante `X-Rate-Limit-Remaining: 0` pausa proactivamente.
 - **Fase 2:** `npm run scan` valida solo las env vars que usa (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TRAVELPAYOUTS_TOKEN`) vía `loadConfigSubset`, igual que el seed; el orquestador de Fase 7 usará `loadConfig()` completo.
 - **Fase 2:** "las 60 rutas principales" del bootstrap = las primeras 60 rutas activas con origen EZE (aeropuerto internacional principal), en orden de seed.
+- **Fase 2 (operación):** se adelantó un `scan.yml` mínimo (cron cada 8 h, solo barrido) para acumular baseline mientras se construyen las fases restantes; la Fase 7 lo extiende al pipeline completo. Requiere Node 22 en el runner (supabase-js necesita WebSocket nativo).
+- **Fase 3:** el refresh de stats vive en una función SQL (`refresh_route_stats`, migración 003) llamada por RPC — `percentile_cont` corre server-side como exige el plan.
+- **Fase 3:** "precio reciente de la última corrida" = observaciones `travelpayouts` de las últimas 12 h (constante `LOOKBACK_HOURS`, cubre el cron de 8 h con margen).
+- **Fase 3:** se crea **un deal por ruta por corrida**: la observación calificante más barata; las demás fechas calificantes alimentan el `breadth_bonus`. El cooldown de 72 h ya impone un deal por ruta de todos modos.
+- **Fase 3:** `is_error_fare` requiere estadística usable (≥25 muestras); un precio bajo el umbral absoluto sin muestra suficiente es candidato pero nunca error fare (sin mediana confiable no hay "50% de la mediana").
+- **Fase 3:** `region_weight` para `other` = 0 (el plan no lo define).
+- **Fase 3:** `getRecentObservations` pagina de a 1000 filas — PostgREST capea las respuestas y un barrido completo inserta ~2000 (bug encontrado en el smoke test real: evaluaba solo las primeras 1000).

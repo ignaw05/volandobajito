@@ -42,7 +42,10 @@ function createSupabaseStub(results: StubResult[] = [{ data: null }]) {
 				"upsert",
 				"update",
 				"eq",
+				"neq",
+				"gte",
 				"order",
+				"range",
 				"single",
 			]) {
 				builder[method] = (...args: unknown[]) => {
@@ -204,6 +207,58 @@ describe("createDeal / transitionDeal", () => {
 			rejection_reason: "price_gone",
 		});
 		expect(findOp(calls[0]!, "eq").args).toEqual(["id", "d1"]);
+	});
+});
+
+describe("getRecentObservations", () => {
+	it("paginates past the 1000-row PostgREST cap", async () => {
+		const fullPage = Array.from({ length: 1000 }, (_, i) => ({
+			...observation,
+			id: i + 1,
+		}));
+		const lastPage = [{ ...observation, id: 1001 }];
+		const { client, calls } = createSupabaseStub([
+			{ data: fullPage },
+			{ data: lastPage },
+		]);
+		const rows = await createDb(client).getRecentObservations(
+			"2026-06-12T00:00:00Z",
+		);
+		expect(rows.length).toBe(1001);
+		expect(calls.length).toBe(2);
+		expect(findOp(calls[0]!, "range").args).toEqual([0, 999]);
+		expect(findOp(calls[1]!, "range").args).toEqual([1000, 1999]);
+		expect(findOp(calls[0]!, "eq").args).toEqual(["source", "travelpayouts"]);
+		expect(findOp(calls[0]!, "gte").args).toEqual([
+			"observed_at",
+			"2026-06-12T00:00:00Z",
+		]);
+	});
+});
+
+describe("getRoutesWithDealsSince", () => {
+	it("excludes rejected deals and maps to route ids", async () => {
+		const { client, calls } = createSupabaseStub([
+			{ data: [{ route_id: 3 }, { route_id: 9 }] },
+		]);
+		const ids = await createDb(client).getRoutesWithDealsSince(
+			"2026-06-09T12:00:00Z",
+		);
+		expect(ids).toEqual([3, 9]);
+		expect(findOp(calls[0]!, "neq").args).toEqual(["status", "rejected"]);
+		expect(findOp(calls[0]!, "gte").args).toEqual([
+			"detected_at",
+			"2026-06-09T12:00:00Z",
+		]);
+	});
+});
+
+describe("createDeals", () => {
+	it("skips the insert entirely for an empty batch", async () => {
+		const { client, calls } = createSupabaseStub();
+		const count = await createDb(client).createDeals([]);
+		expect(count).toBe(0);
+		expect(calls.length).toBe(0);
 	});
 });
 

@@ -44,6 +44,11 @@ export interface RouteStats {
 	window_days: number;
 }
 
+export interface PriceObservation extends NewPriceObservation {
+	id: number;
+	observed_at: string;
+}
+
 export interface NewDeal {
 	route_id: number;
 	depart_date: string;
@@ -137,6 +142,66 @@ export function createDb(supabase: SupabaseClient) {
 				unwrap(result, `insertPriceObservations (chunk at ${i})`);
 			}
 			return rows.length;
+		},
+
+		/**
+		 * Recomputes route_stats (median/p10/p25 via percentile_cont) over the
+		 * trailing window, server-side. Returns the number of routes refreshed.
+		 */
+		async refreshRouteStats(windowDays = 90): Promise<number> {
+			const result = await supabase.rpc("refresh_route_stats", {
+				p_window_days: windowDays,
+			});
+			return unwrap(result as DbResult<number>, "refreshRouteStats");
+		},
+
+		async listRouteStats(): Promise<RouteStats[]> {
+			const result = await supabase.from("route_stats").select("*");
+			return unwrap(result, "listRouteStats") ?? [];
+		},
+
+		/**
+		 * Layer-1 observations since a given instant (the latest scan run).
+		 * Paginated: PostgREST caps responses at 1000 rows and a full sweep
+		 * inserts ~2000.
+		 */
+		async getRecentObservations(sinceIso: string): Promise<PriceObservation[]> {
+			const pageSize = 1000;
+			const rows: PriceObservation[] = [];
+			for (let from = 0; ; from += pageSize) {
+				const result = await supabase
+					.from("price_history")
+					.select("*")
+					.eq("source", "travelpayouts")
+					.gte("observed_at", sinceIso)
+					.order("id")
+					.range(from, from + pageSize - 1);
+				const page: PriceObservation[] =
+					unwrap(result, "getRecentObservations") ?? [];
+				rows.push(...page);
+				if (page.length < pageSize) return rows;
+			}
+		},
+
+		/**
+		 * Route ids with a non-rejected deal detected since the given instant.
+		 * Used for the 72h per-route cooldown.
+		 */
+		async getRoutesWithDealsSince(sinceIso: string): Promise<number[]> {
+			const result = await supabase
+				.from("deals")
+				.select("route_id")
+				.neq("status", "rejected")
+				.gte("detected_at", sinceIso);
+			const rows = unwrap(result, "getRoutesWithDealsSince") ?? [];
+			return (rows as { route_id: number }[]).map((row) => row.route_id);
+		},
+
+		async createDeals(deals: NewDeal[]): Promise<number> {
+			if (deals.length === 0) return 0;
+			const result = await supabase.from("deals").insert(deals);
+			unwrap(result, "createDeals");
+			return deals.length;
 		},
 
 		async upsertRouteStats(stats: RouteStats[]): Promise<void> {
