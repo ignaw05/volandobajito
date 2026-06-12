@@ -16,11 +16,14 @@
 		"scan": "tsx src/pipeline/scan.ts",
 		"detect": "tsx src/pipeline/detect.ts",
 		"verify": "tsx src/pipeline/verify.ts",
+		"recheck": "tsx src/pipeline/recheck.ts",
+		"bot": "tsx src/curation/bot.ts",
 		"bootstrap-baseline": "tsx scripts/bootstrap-baseline.ts"
 	},
 	"dependencies": {
 		"@supabase/supabase-js": "^2.108.1",
 		"dotenv": "^16.4.5",
+		"grammy": "^1.43.0",
 		"zod": "^4.0.0"
 	},
 	"devDependencies": {

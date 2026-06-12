@@ -1,0 +1,103 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formatCuratorAlert > flags error fares in the header 1`] = `
+"🔔 Deal verificado: AEP → MAD · 🔥 TARIFA ERROR
+💵 caché USD 913 → en vivo USD 941
+📉 35% bajo la mediana (USD 1404)
+🛫 LATAM · Con escalas
+📅 2026-08-19 → 2026-09-08
+⭐ Score 52"
+`;
+
+exports[`formatCuratorAlert > full alert 1`] = `
+"🔔 Deal verificado: AEP → MAD
+💵 caché USD 913 → en vivo USD 941
+📉 35% bajo la mediana (USD 1404)
+🛫 LATAM · Con escalas
+📅 2026-08-19 → 2026-09-08
+⭐ Score 52"
+`;
+
+exports[`formatCuratorAlert > omits optional lines when stats are missing 1`] = `
+"🔔 Deal verificado: AEP → MAD
+💵 caché USD 913 → en vivo USD 941
+📅 2026-08-19 (solo ida)"
+`;
+
+exports[`formatDealPost > error fare gets its own header copy 1`] = `
+"🔥 ¡TARIFA ERROR! Buenos Aires → Madrid
+
+💵 USD 489 (≈ $733.500 dólar tarjeta)
+📉 38% más barato que lo habitual en esta ruta
+🛫 Iberia · Directo
+📅 Fechas: 12-28 de marzo
+
+👉 Ver vuelo: https://go.example.com/go/deal-uuid-1
+
+⚡ Las tarifas así suelen durar horas. Verificá el precio final antes de pagar."
+`;
+
+exports[`formatDealPost > full post with ARS rate and round trip 1`] = `
+"✈️ ¡GANGA! Buenos Aires → Madrid
+
+💵 USD 489 (≈ $733.500 dólar tarjeta)
+📉 38% más barato que lo habitual en esta ruta
+🛫 Iberia · Directo
+📅 Fechas: 12-28 de marzo
+
+👉 Ver vuelo: https://go.example.com/go/deal-uuid-1
+
+⚡ Las tarifas así suelen durar horas. Verificá el precio final antes de pagar."
+`;
+
+exports[`formatDealPost > omits flight line and discount when data is missing 1`] = `
+"✈️ ¡GANGA! Buenos Aires → Madrid
+
+💵 USD 489 (≈ $733.500 dólar tarjeta)
+📅 Fechas: 12-28 de marzo
+
+👉 Ver vuelo: https://go.example.com/go/deal-uuid-1
+
+⚡ Las tarifas así suelen durar horas. Verificá el precio final antes de pagar."
+`;
+
+exports[`formatDealPost > one-way post without return date 1`] = `
+"✈️ ¡GANGA! Buenos Aires → Madrid
+
+💵 USD 489 (≈ $733.500 dólar tarjeta)
+📉 38% más barato que lo habitual en esta ruta
+🛫 Iberia · Directo
+📅 Fechas: 12 de marzo (solo ida)
+
+👉 Ver vuelo: https://go.example.com/go/deal-uuid-1
+
+⚡ Las tarifas así suelen durar horas. Verificá el precio final antes de pagar."
+`;
+
+exports[`formatDealPost > publishes USD-only when the ARS rate is unavailable 1`] = `
+"✈️ ¡GANGA! Buenos Aires → Madrid
+
+💵 USD 489
+📉 38% más barato que lo habitual en esta ruta
+🛫 Iberia · Directo
+📅 Fechas: 12-28 de marzo
+
+👉 Ver vuelo: https://go.example.com/go/deal-uuid-1
+
+⚡ Las tarifas así suelen durar horas. Verificá el precio final antes de pagar."
+`;
+
+exports[`formatExpiredPost > prepends the expired banner to the original post 1`] = `
+"⚠️ EXPIRADO — esta tarifa ya no está disponible.
+
+✈️ ¡GANGA! Buenos Aires → Madrid
+
+💵 USD 489 (≈ $733.500 dólar tarjeta)
+📉 38% más barato que lo habitual en esta ruta
+🛫 Iberia · Directo
+📅 Fechas: 12-28 de marzo
+
+👉 Ver vuelo: https://go.example.com/go/deal-uuid-1
+
+⚡ Las tarifas así suelen durar horas. Verificá el precio final antes de pagar."
+`;

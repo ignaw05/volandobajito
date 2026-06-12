@@ -4,6 +4,7 @@ import {
 	type FlightVerifier,
 	googleFlightsUrl,
 } from "../clients/flightVerifier.js";
+import { createTelegramClient } from "../clients/telegram.js";
 import { loadConfigSubset } from "../config.js";
 import {
 	type CandidateWithRoute,
@@ -13,6 +14,7 @@ import {
 	type DealPatch,
 	type DealStatus,
 } from "../db/queries.js";
+import { formatCuratorAlert } from "../publish/format.js";
 
 /**
  * The layer-1 cache is always somewhat stale; a live price up to 15%
@@ -43,6 +45,11 @@ export interface VerifyDeps {
 	verifier: FlightVerifier;
 	/** Hard cap of paid calls for this run (MAX_VERIFICATIONS_PER_RUN). */
 	budget: number;
+	/**
+	 * Called after a deal is confirmed so the curator can approve it.
+	 * Failures are logged but never fail the verification itself.
+	 */
+	notifyCurator?: (deal: CandidateWithRoute) => Promise<void>;
 	log?: (line: string) => void;
 }
 
@@ -98,6 +105,21 @@ export async function runVerify(deps: VerifyDeps): Promise<VerifySummary> {
 				log(
 					`verify: CONFIRMED ${label} cached=$${candidate.cached_price_usd} live=$${result.priceUsd}`,
 				);
+				if (deps.notifyCurator) {
+					try {
+						await deps.notifyCurator({
+							...candidate,
+							status: "verified",
+							verified_price_usd: livePriceUsd,
+							airline: result.airline ?? candidate.airline,
+							direct: result.direct ?? candidate.direct,
+						});
+					} catch (notifyError) {
+						log(
+							`verify: curator notification failed for ${label}: ${String(notifyError)}`,
+						);
+					}
+				}
 			} else {
 				await deps.db.transitionDeal(candidate.id, "rejected", {
 					rejection_reason: "price_gone",
@@ -140,6 +162,8 @@ async function main(): Promise<void> {
 		"SEARCHAPI_KEY",
 		"FLIGHTAPI_KEY",
 		"MAX_VERIFICATIONS_PER_RUN",
+		"TELEGRAM_BOT_TOKEN",
+		"CURATOR_CHAT_ID",
 	);
 	const db = createDb(
 		createSupabase(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY),
@@ -148,10 +172,31 @@ async function main(): Promise<void> {
 		...(config.SEARCHAPI_KEY ? { searchApiKey: config.SEARCHAPI_KEY } : {}),
 		...(config.FLIGHTAPI_KEY ? { flightApiKey: config.FLIGHTAPI_KEY } : {}),
 	});
+	const telegram = createTelegramClient(config.TELEGRAM_BOT_TOKEN);
 	const summary = await runVerify({
 		db,
 		verifier,
 		budget: config.MAX_VERIFICATIONS_PER_RUN,
+		notifyCurator: async (deal) => {
+			await telegram.sendWithApprovalButtons(
+				config.CURATOR_CHAT_ID,
+				formatCuratorAlert({
+					origin: deal.routes.origin,
+					destination: deal.routes.destination,
+					cachedPriceUsd: deal.cached_price_usd,
+					verifiedPriceUsd: deal.verified_price_usd as number,
+					medianAtDetection: deal.median_at_detection,
+					discountPct: deal.discount_pct,
+					airline: deal.airline,
+					direct: deal.direct,
+					departDate: deal.depart_date,
+					returnDate: deal.return_date,
+					score: deal.score,
+					isErrorFare: deal.is_error_fare,
+				}),
+				deal.id,
+			);
+		},
 	});
 	if (summary.errors > 0 && summary.confirmed === 0 && summary.rejected === 0) {
 		process.exit(1);

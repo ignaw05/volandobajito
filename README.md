@@ -42,10 +42,30 @@ Alternativa al SQL de seed: `npm run seed-routes` upsertea las mismas rutas vía
 | `npm run detect` | Capa 2: refresh de stats + detección de candidatos | ✅ 3 |
 | `npm run verify` | Capa 3: verificación real-time de candidatos (⚠️ gasta cuota paga) | ✅ 4 |
 | `npm run pipeline` | scan → detect → verify (verify omitido si `SILENT_MODE=true`) | 4 |
-| `npm run recheck` | Re-verificación de deals publicados (< 72 h) | 5 |
-| `npm run bot` | Bot de curaduría (long-polling, proceso persistente) | 5 |
+| `npm run recheck` | Re-verificación de deals publicados (< 72 h; ⚠️ gasta cuota paga, no-op si `SILENT_MODE=true`) | ✅ 5 |
+| `npm run bot` | Bot de curaduría (long-polling, proceso persistente) | ✅ 5 |
 
 Los comandos de fases futuras se agregan a `package.json` cuando su fase se implementa.
+
+## Prueba end-to-end manual (Fase 5)
+
+Requiere un bot de Telegram de prueba y un canal de prueba en `.env` (`TELEGRAM_BOT_TOKEN`, `CURATOR_CHAT_ID`, `CHANNEL_ID`, `REDIRECT_BASE_URL`).
+
+1. **Deal de prueba** — insertarlo ya verificado en Supabase (SQL Editor), así no gasta cuota de verificación:
+
+   ```sql
+   insert into deals (route_id, status, depart_date, return_date,
+                      cached_price_usd, verified_price_usd, airline, direct,
+                      median_at_detection, discount_pct, score, verified_at)
+   select id, 'verified', current_date + 30, current_date + 45,
+          489, 489, 'Test Air', true, 800, 0.39, 60, now()
+   from routes where origin = 'EZE' and destination = 'MAD';
+   ```
+
+2. **Bot de curaduría** — `npm run bot` y, en el chat del curador, enviar `/pending`: llega la alerta del deal con botones ✅ Publicar / ❌ Rechazar. (Cuando el deal lo confirma `npm run verify`, la alerta llega sola.)
+3. **Aprobar** — tocar ✅ Publicar: el post aparece en el canal de prueba, el deal pasa a `published` con `telegram_message_id` y la alerta queda marcada "✅ Publicado en el canal".
+4. **Forzar expiración** — `SILENT_MODE=false npm run recheck` (⚠️ 1 llamada paga por deal publicado). Como la tarifa de prueba no existe en vivo, el verifier no la encuentra: el post del canal se edita con el banner `⚠️ EXPIRADO —` y el deal pasa a `expired`.
+5. **Limpieza** — borrar el deal de prueba: `delete from deals where airline = 'Test Air';`
 
 ## Estado de fases
 
@@ -54,7 +74,7 @@ Los comandos de fases futuras se agregan a `package.json` cuando su fase se impl
 - [x] **Fase 2** — Capa 1: scanner (Travelpayouts)
 - [x] **Fase 3** — Capa 2: detección estadística
 - [x] **Fase 4** — Capa 3: verificación en tiempo real
-- [ ] **Fase 5** — Bot de curaduría + publicación
+- [x] **Fase 5** — Bot de curaduría + publicación
 - [ ] **Fase 6** — Redirect con tracking (Vercel)
 - [ ] **Fase 7** — Orquestación (GitHub Actions)
 
@@ -88,3 +108,10 @@ Los comandos de fases futuras se agregan a `package.json` cuando su fase se impl
 - **Fase 4:** los candidatos se verifican ordenados por `is_error_fare desc, score desc` — las tarifas error tienen prioridad máxima de cola, como pide la Fase 3.
 - **Fase 4:** sin `return_date` la búsqueda lleva `flight_type=one_way`; el `booking_url` usa el deep link del proveedor si viene, si no el formato `google.com/travel/flights?q=...`.
 - **Fase 4:** hallazgo operativo: deals originados en low-cost (JetSmart) pueden no ser armables como ida+vuelta en Google Flights → `price_gone`. Si la tasa de confirmación da muy baja por esto, considerar verificar tramos one-way por separado (decisión futura, no implementado).
+- **Fase 5:** el gate del curador es un middleware silencioso: cualquier update cuyo chat no sea `CURATOR_CHAT_ID` se descarta sin respuesta ni log (nada que un tercero pueda sondear).
+- **Fase 5:** `/pending` reenvía cada deal `verified` sin resolver con botones frescos (máx. 10 por invocación) — una alerta perdida siempre es recuperable.
+- **Fase 5:** `/stats` cubre las últimas 24 h con los contadores del embudo (candidatos/verificados/publicados/clicks). Las "corridas" no se persisten en DB; se ven en los logs de Actions (más simple que una tabla de runs).
+- **Fase 5:** el texto del post no se guarda: `recheck` lo regenera desde la fila del deal para editar el mensaje expirado. La cifra en ARS puede diferir levemente de la original (cotización del momento) — irrelevante en una tarifa muerta.
+- **Fase 5:** si la edición del post del canal falla, el deal igual pasa a `expired`: un banner desactualizado es recuperable, una tarifa muerta como `published` no.
+- **Fase 5:** `npm run recheck` es no-op con `SILENT_MODE=true` (modo prueba: el cron jamás gasta llamadas pagas) y comparte el presupuesto `MAX_VERIFICATIONS_PER_RUN` con verify.
+- **Fase 5:** el bot corre con la opción (A) del plan: proceso persistente long-polling en un host del operador (`npm run bot`). El pipeline no necesita el bot activo para notificar — `verify` envía la alerta vía sendMessage directo y los callbacks se procesan cuando el bot está corriendo.

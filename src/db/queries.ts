@@ -75,9 +75,20 @@ export interface Deal extends NewDeal {
 	rejection_reason: string | null;
 }
 
-/** Deal plus the embedded route, as returned by getTopCandidates. */
-export interface CandidateWithRoute extends Deal {
+/** Deal plus its embedded route. */
+export interface DealWithRoute extends Deal {
 	routes: { origin: string; destination: string };
+}
+
+/** @deprecated alias kept for the verify pipeline's original name. */
+export type CandidateWithRoute = DealWithRoute;
+
+/** Funnel counters for /stats. */
+export interface FunnelStats {
+	candidates: number;
+	verified: number;
+	published: number;
+	clicks: number;
 }
 
 /** Mutable deal fields that may accompany a status transition. */
@@ -266,6 +277,64 @@ export function createDb(supabase: SupabaseClient) {
 				.order("score", { ascending: false })
 				.limit(limit);
 			return unwrap(result, "getTopCandidates") ?? [];
+		},
+
+		async getDealWithRouteById(id: string): Promise<DealWithRoute | null> {
+			const result = await supabase
+				.from("deals")
+				.select("*, routes(origin, destination)")
+				.eq("id", id)
+				.single();
+			if (result.error?.message.includes("0 rows")) return null;
+			return unwrap(result, `getDealWithRouteById(${id})`);
+		},
+
+		async getDealsWithRoutesByStatus(
+			status: DealStatus,
+		): Promise<DealWithRoute[]> {
+			const result = await supabase
+				.from("deals")
+				.select("*, routes(origin, destination)")
+				.eq("status", status)
+				.order("detected_at", { ascending: false });
+			return unwrap(result, `getDealsWithRoutesByStatus(${status})`) ?? [];
+		},
+
+		/** Published deals newer than the instant, for the recheck loop. */
+		async getPublishedDealsSince(sinceIso: string): Promise<DealWithRoute[]> {
+			const result = await supabase
+				.from("deals")
+				.select("*, routes(origin, destination)")
+				.eq("status", "published")
+				.gte("published_at", sinceIso)
+				.order("published_at", { ascending: true });
+			return unwrap(result, "getPublishedDealsSince") ?? [];
+		},
+
+		/** Funnel counters since an instant (for /stats). */
+		async getFunnelStatsSince(sinceIso: string): Promise<FunnelStats> {
+			const count = async (
+				table: string,
+				column: string,
+				extra?: { status?: DealStatus },
+			) => {
+				let query = supabase
+					.from(table)
+					.select("*", { count: "exact", head: true })
+					.gte(column, sinceIso);
+				if (extra?.status) query = query.eq("status", extra.status);
+				const result = (await query) as DbResult<unknown> & {
+					count: number | null;
+				};
+				unwrap(result, `getFunnelStatsSince(${table}.${column})`);
+				return result.count ?? 0;
+			};
+			return {
+				candidates: await count("deals", "detected_at"),
+				verified: await count("deals", "verified_at"),
+				published: await count("deals", "published_at"),
+				clicks: await count("click_events", "clicked_at"),
+			};
 		},
 
 		async getDealsByStatus(status: DealStatus): Promise<Deal[]> {
