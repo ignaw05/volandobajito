@@ -29,10 +29,12 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
-          VERIFIER_PROVIDER: ${{ secrets.VERIFIER_PROVIDER || 'searchapi' }}
+          VERIFIER_PROVIDER: ${{ secrets.VERIFIER_PROVIDER || 'fli' }}
           SEARCHAPI_KEY: ${{ secrets.SEARCHAPI_KEY }}
           FLIGHTAPI_KEY: ${{ secrets.FLIGHTAPI_KEY }}
           MAX_VERIFICATIONS_PER_RUN: ${{ secrets.MAX_VERIFICATIONS_PER_RUN || '2' }}
+          FLI_MAX_VERIFICATIONS_PER_RUN: ${{ secrets.FLI_MAX_VERIFICATIONS_PER_RUN || '80' }}
+          FLI_PAUSE_MS: ${{ secrets.FLI_PAUSE_MS || '1500' }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CURATOR_CHAT_ID: ${{ secrets.CURATOR_CHAT_ID }}
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}

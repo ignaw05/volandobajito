@@ -88,14 +88,21 @@ Con el flag activado (default `false` = flujo manual de siempre), un deal verifi
 - Cota de frescura: un deal verificado hace **más de 60 min no se auto-publica** (precio potencialmente vencido tras una caída del bot); queda para aprobación manual.
 - Activar: secret/env `AUTO_PUBLISH=true` tanto en Actions (cambia el formato de alerta de verify) como en el host del bot (activa el barrido). Requiere bot corriendo 24/7.
 
-## Spike fli (experimento, sin integrar)
+## Verificación con fli + fallback SearchApi
 
-[`fli`](https://github.com/punitarani/fli) accede a la API interna de Google Flights por ingeniería inversa (gratis, sin key, MIT) — candidato a reemplazar SearchApi en verify y eliminar el único costo recurrente. Riesgos asumidos: no oficial (zona gris de ToS), puede romperse o ser bloqueado sin aviso, especialmente desde IPs de datacenter como las de los runners de Actions. El modo de falla es seguro: verify lanza error y nada se publica.
+[`fli`](https://github.com/punitarani/fli) accede a la API interna de Google Flights por ingeniería inversa (gratis, sin key, MIT). Es el proveedor de verify por defecto (`VERIFIER_PROVIDER=fli`), con SearchApi como fallback pago. Riesgos asumidos: no oficial (zona gris de ToS), puede romperse o ser bloqueado sin aviso. El modo de falla es seguro: si fli falla y no hay fallback (o se agotó el presupuesto), verify deja el deal como `candidate` y nada se publica.
 
-- `vendor/fli-js-0.0.4.tgz`: el port TypeScript no está publicado en npm; se vendorea el tarball buildeado desde el repo (devDependency `file:`).
-- `npx tsx scripts/spike-fli.ts`: 5 rutas representativas one-way a +30 días; imprime precio mínimo/aerolínea/escalas por ruta. Local (2026-06-12): **5/5 OK** con ~100 opciones con precio por ruta.
-- Workflow `fli-spike` (solo manual): el mismo script desde un runner de Actions — la prueba decisiva. Correrlo 2–3 veces en horarios distintos.
-- Decisión pendiente de los resultados: si los runners pasan consistentemente → integrar como `VERIFIER_PROVIDER=fli` con SearchApi de fallback; si hay bloqueos → seguir con SearchApi (o evaluar proxy).
+**El spike que llevó a la decisión** (`scripts/spike-fli.ts` + workflow manual `fli-spike`): 5 rutas one-way desde un runner de Actions, 3 corridas en horarios distintos (2026-06-12/13). Resultado: **5/5 OK en las 3 corridas, 0 bloqueos** desde IPs de datacenter — la prueba decisiva. El `vendor/fli-js-0.0.4.tgz` se vendorea (el port TS no está en npm) y es dependency de producción.
+
+**Cómo opera el verifier compuesto** (`src/clients/fallbackVerifier.ts`):
+
+- **fli primero, gratis.** Como no cuesta, verify barre hasta `FLI_MAX_VERIFICATIONS_PER_RUN` candidatos (default 80), no solo los que entran en el presupuesto pago. Pausa `FLI_PAUSE_MS` (default 1500 ms) entre llamadas para no martillar Google desde una sola IP.
+- **Fallback pago acotado.** Si fli lanza error en un candidato y queda presupuesto, cae a SearchApi. `MAX_VERIFICATIONS_PER_RUN` ahora acota **solo** las llamadas de fallback pagas.
+- **Reintento al cierre.** Los candidatos que terminan en error se reintentan una vez más **solo con fli** (sin gastar SearchApi) antes de quedar como `candidate` para la próxima corrida.
+- **Alerta de degradación.** Al cierre de cada corrida, si fli falló: una alerta a `CURATOR_CHAT_ID` (`⚠️ fli degradado` con el conteo de fallbacks; `🚨 fli CAÍDO` si falló en el 100% de las llamadas — señal de bloqueo de Google).
+- Round-trips: fli selecciona el outbound más barato (`topN: 1`) y lee su total de vuelta — dos fetches, no el fan-out multi-leg completo.
+
+Para volver a SearchApi puro: secret `VERIFIER_PROVIDER=searchapi`.
 
 ## Orquestación (Fase 7)
 

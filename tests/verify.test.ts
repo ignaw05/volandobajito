@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { createFallbackVerifier } from "../src/clients/fallbackVerifier.js";
 import {
 	createSearchApiVerifier,
 	createVerifier,
@@ -219,6 +220,7 @@ describe("runVerify", () => {
 					return result as VerificationResult;
 				},
 			},
+			candidateLimit: 2,
 			budget: 2,
 			log: (line: string) => logs.push(line),
 		};
@@ -288,5 +290,101 @@ describe("runVerify", () => {
 		expect(verifyCalls.length).toBe(2);
 		expect(summary.paidCalls).toBe(2);
 		expect(summary.budget).toBe(2);
+	});
+
+	// --- fli provider: free primary + paid SearchApi fallback ---
+
+	/**
+	 * Builds runVerify deps wired like the fli provider: a scripted primary
+	 * (one behaviour per verify call), no paid fallback by default, and a high
+	 * candidateLimit decoupled from the paid budget.
+	 */
+	function fliHarness(
+		candidates: CandidateWithRoute[],
+		primaryScript: (VerificationResult | Error)[],
+		opts: { fallback?: VerificationResult | Error; budget?: number } = {},
+	) {
+		const transitions: { id: string; status: DealStatus }[] = [];
+		const operatorAlerts: string[] = [];
+		let call = 0;
+		const primary = {
+			async verify() {
+				const step = primaryScript[Math.min(call, primaryScript.length - 1)];
+				call += 1;
+				if (step instanceof Error) throw step;
+				return step as VerificationResult;
+			},
+		};
+		const fallback =
+			opts.fallback === undefined
+				? null
+				: {
+						async verify() {
+							if (opts.fallback instanceof Error) throw opts.fallback;
+							return opts.fallback as VerificationResult;
+						},
+					};
+		const verifier = createFallbackVerifier(
+			primary,
+			fallback,
+			opts.budget ?? 0,
+			() => {},
+		);
+		const deps = {
+			db: {
+				getTopCandidates: async (limit: number) => candidates.slice(0, limit),
+				transitionDeal: async (id: string, status: DealStatus) => {
+					transitions.push({ id, status });
+					return { id } as Deal;
+				},
+			},
+			verifier,
+			candidateLimit: 50,
+			budget: opts.budget ?? 0,
+			notifyOperator: async (text: string) => {
+				operatorAlerts.push(text);
+			},
+			log: () => {},
+		};
+		return { deps, verifier, transitions, operatorAlerts };
+	}
+
+	it("verifies far more candidates than the paid budget when free", async () => {
+		const candidates = Array.from({ length: 5 }, () => candidate(913));
+		const { deps, verifier, transitions, operatorAlerts } = fliHarness(
+			candidates,
+			[liveOk],
+		);
+		const summary = await runVerify(deps);
+		expect(summary.confirmed).toBe(5);
+		expect(summary.paidCalls).toBe(0);
+		expect(verifier.stats.primaryCalls).toBe(5);
+		expect(transitions).toHaveLength(5);
+		expect(operatorAlerts).toEqual([]);
+	});
+
+	it("retries an errored candidate with fli before giving up", async () => {
+		// First verify throws; the end-of-run primary-only retry succeeds.
+		const { deps, transitions } = fliHarness(
+			[candidate(913)],
+			[new Error("fli: transient"), liveOk],
+		);
+		const summary = await runVerify(deps);
+		expect(summary.errors).toBe(0);
+		expect(summary.confirmed).toBe(1);
+		expect(transitions).toHaveLength(1);
+		expect(transitions[0]?.status).toBe("verified");
+	});
+
+	it("alerts the operator when fli collapses on every call", async () => {
+		const { deps, operatorAlerts } = fliHarness(
+			[candidate(913), candidate(913)],
+			[new Error("fli: blocked")],
+		);
+		const summary = await runVerify(deps);
+		expect(summary.confirmed).toBe(0);
+		expect(summary.errors).toBe(2);
+		expect(operatorAlerts).toHaveLength(1);
+		expect(operatorAlerts[0]).toMatch(/CAÍDO/);
 	});
 });

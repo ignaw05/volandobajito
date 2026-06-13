@@ -14,10 +14,19 @@ const baseEnvSchema = z.object({
 	TRAVELPAYOUTS_TOKEN: z.string().min(1),
 
 	// Layer 3: real-time verification
-	VERIFIER_PROVIDER: z.enum(["searchapi", "flightapi"]).default("searchapi"),
+	VERIFIER_PROVIDER: z
+		.enum(["searchapi", "flightapi", "fli"])
+		.default("searchapi"),
 	SEARCHAPI_KEY: z.string().optional(),
 	FLIGHTAPI_KEY: z.string().optional(),
+	// Hard cap on PAID provider calls per run (SearchApi/flightapi, or the
+	// SearchApi fallback when VERIFIER_PROVIDER=fli).
 	MAX_VERIFICATIONS_PER_RUN: z.coerce.number().int().positive().default(15),
+	// fli is free, so verify can sweep far more candidates than the paid cap.
+	// This bounds the free fli pass (runtime + block risk from one runner IP).
+	FLI_MAX_VERIFICATIONS_PER_RUN: z.coerce.number().int().positive().default(80),
+	// Pause between fli calls to avoid hammering Google from one datacenter IP.
+	FLI_PAUSE_MS: z.coerce.number().int().nonnegative().default(1500),
 
 	// Optional baseline bootstrap
 	SERPAPI_KEY: z.string().optional(),

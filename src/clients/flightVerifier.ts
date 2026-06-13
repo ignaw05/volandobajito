@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { createFallbackVerifier } from "./fallbackVerifier.js";
+import { createFliVerifier } from "./fliVerifier.js";
 
 /**
  * Layer 3: real-time price verification behind a provider-agnostic
@@ -184,17 +186,38 @@ export function createSearchApiVerifier(
 	};
 }
 
-export type VerifierProvider = "searchapi" | "flightapi";
+export type VerifierProvider = "searchapi" | "flightapi" | "fli";
+
+export interface CreateVerifierOptions {
+	/** Paid-call cap for the SearchApi fallback when provider is "fli". */
+	fallbackBudget?: number;
+	log?: (line: string) => void;
+}
 
 export function createVerifier(
 	provider: VerifierProvider,
 	keys: { searchApiKey?: string; flightApiKey?: string },
+	options: CreateVerifierOptions = {},
 ): FlightVerifier {
 	if (provider === "searchapi") {
 		if (!keys.searchApiKey) {
 			throw new Error("SEARCHAPI_KEY is required for the searchapi verifier");
 		}
 		return createSearchApiVerifier(keys.searchApiKey);
+	}
+	if (provider === "fli") {
+		// fli is free and primary; SearchApi (when keyed) is the paid fallback
+		// for the calls fli can't serve. With no key, fli runs solo — still
+		// fail-safe, since a fli error just leaves the deal unverified.
+		const fallback = keys.searchApiKey
+			? createSearchApiVerifier(keys.searchApiKey)
+			: null;
+		return createFallbackVerifier(
+			createFliVerifier(),
+			fallback,
+			options.fallbackBudget ?? 0,
+			options.log,
+		);
 	}
 	// Skeleton kept on purpose: the interface is the contract, the provider
 	// is swappable without touching pipeline logic.
