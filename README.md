@@ -88,6 +88,22 @@ Con el flag activado (default `false` = flujo manual de siempre), un deal verifi
 - Cota de frescura: un deal verificado hace **más de 60 min no se auto-publica** (precio potencialmente vencido tras una caída del bot); queda para aprobación manual.
 - Activar: secret/env `AUTO_PUBLISH=true` tanto en Actions (cambia el formato de alerta de verify) como en el host del bot (activa el barrido). Requiere bot corriendo 24/7.
 
+## Deploy del bot a Render
+
+El bot de curaduría (`npm run bot`) es lo único que necesita un host 24/7 — el resto (scan/detect/verify/recheck) corre solo en Actions. Se despliega como contenedor con `Dockerfile` + `render.yaml` (blueprint).
+
+**Pasos:**
+
+1. En el [dashboard de Render](https://dashboard.render.com) → **New → Blueprint** → elegí este repo. Render lee `render.yaml` y crea el servicio `volandobajito-bot`.
+2. Cargá las env vars (marcadas `sync: false`, se setean en el dashboard): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_TOKEN`, `CURATOR_CHAT_ID`, `CHANNEL_ID`, `REDIRECT_BASE_URL`. `AUTO_PUBLISH` viene en `"true"` (cambiá a `"false"` para curaduría 100% manual).
+3. Deploy. El log debe mostrar `curation bot: starting long-polling` y `health server listening on :PORT`.
+
+**Mantenerlo despierto (plan `free`):** un Web Service gratis de Render se duerme tras ~15 min sin tráfico HTTP, lo que mataría el long-polling. El bot expone un health endpoint en `$PORT` justo para esto: registrá un monitor de uptime gratis ([cron-job.org](https://cron-job.org), [UptimeRobot](https://uptimerobot.com)) que pegue a la URL del servicio cada ~10 min. La cota de frescura de 60 min cubre los cold-starts: nada se auto-publica vencido tras un reinicio.
+
+**Sin hacks (paga, ~US$7/mes):** en `render.yaml` cambiá `type: web` → `worker`, `plan: free` → `starter` y quitá `healthCheckPath`. Un Background Worker queda siempre encendido, sin necesidad de pinger.
+
+> El `Dockerfile` corre el bot vía `tsx` (instala deps completas, incluido el `vendor/fli-js`). Build verificado localmente: imagen OK + arranque del bot y health server confirmados.
+
 ## Verificación con fli + fallback SearchApi
 
 [`fli`](https://github.com/punitarani/fli) accede a la API interna de Google Flights por ingeniería inversa (gratis, sin key, MIT). Es el proveedor de verify por defecto (`VERIFIER_PROVIDER=fli`), con SearchApi como fallback pago. Riesgos asumidos: no oficial (zona gris de ToS), puede romperse o ser bloqueado sin aviso. El modo de falla es seguro: si fli falla y no hay fallback (o se agotó el presupuesto), verify deja el deal como `candidate` y nada se publica.

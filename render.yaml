@@ -1,0 +1,35 @@
+# Render blueprint for the curation bot (long-polling Telegram + auto-publish
+# sweep). Deploy: Render dashboard → New → Blueprint → pick this repo.
+#
+# Plan note: `free` Web Services sleep after ~15 min without inbound traffic,
+# which would kill the long-poll loop. The Dockerfile/bot expose a health
+# endpoint (port from $PORT) so an external uptime monitor (e.g. cron-job.org,
+# UptimeRobot) hitting the service URL every ~10 min keeps it awake — see
+# README "Deploy del bot a Render". For a no-keep-alive, always-on instance,
+# switch `plan` to `starter` (paid) and `type` to `worker` (drop healthCheckPath).
+services:
+  - type: web
+    name: volandobajito-bot
+    runtime: docker
+    plan: free
+    branch: main
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: CURATOR_CHAT_ID
+        sync: false
+      - key: CHANNEL_ID
+        sync: false
+      - key: REDIRECT_BASE_URL
+        sync: false
+      # Autonomous publishing: verified deals go out after the grace window
+      # unless rejected. Set to "false" to keep manual ✅/❌ curation only.
+      - key: AUTO_PUBLISH
+        value: "true"

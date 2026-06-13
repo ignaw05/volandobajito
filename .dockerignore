@@ -1,0 +1,17 @@
+node_modules
+.git
+.github
+.claude
+.vercel
+.mcp.json
+.env
+.env.*
+!.env.example
+*.log
+tests
+api
+scripts
+migrations
+PLAN_IMPLEMENTACION.md
+README.md
+biome.json
