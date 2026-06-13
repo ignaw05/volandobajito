@@ -261,6 +261,21 @@ async function main(): Promise<void> {
 		);
 	}
 
+	// A long-poll bot has no inbound HTTP, but PaaS free Web Services (Render,
+	// etc.) require a bound port or they are marked unhealthy and killed. When
+	// PORT is set we expose a tiny health endpoint purely to satisfy that — and
+	// to be hit by an uptime monitor that keeps a free instance from sleeping.
+	const port = process.env.PORT;
+	if (port) {
+		const { createServer } = await import("node:http");
+		createServer((_req, res) => {
+			res.writeHead(200, { "content-type": "text/plain" });
+			res.end("ok");
+		}).listen(Number(port), () => {
+			console.log(`curation bot: health server listening on :${port}`);
+		});
+	}
+
 	console.log("curation bot: starting long-polling");
 	await bot.start();
 }
