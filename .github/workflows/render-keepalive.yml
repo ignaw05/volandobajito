@@ -1,0 +1,45 @@
+name: render-keepalive
+
+# Pings the Render free Web Service hosting the curation bot so it does not
+# sleep after ~15 min idle (a long-poll bot has no inbound traffic of its own,
+# so without this the free instance spins down and stops receiving updates).
+#
+# Setup: create the repo secret RENDER_BOT_URL = the service health URL, e.g.
+#   https://volandobajito-bot.onrender.com
+# Unset → every run is a no-op, so this workflow is safe to merge before deploy.
+#
+# ⚠️ COST on a PRIVATE repo: GitHub bills each run at a 1-minute minimum. At the
+# */12 cadence below that is ~3600 min/month, which exceeds the 2000-min free
+# tier and competes with scan/recheck. If Actions minutes matter, prefer a free
+# external monitor (cron-job.org, UptimeRobot) and disable this workflow. On a
+# public repo Actions minutes are unlimited, so this is free there.
+
+on:
+  schedule:
+    # Every 12 min keeps the instance under Render's ~15 min idle window with a
+    # margin for delayed scheduled runs. Tighten to */10 if cold-starts persist.
+    - cron: "*/12 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: render-keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping the bot health endpoint
+        env:
+          URL: ${{ secrets.RENDER_BOT_URL }}
+        run: |
+          if [ -z "$URL" ]; then
+            echo "RENDER_BOT_URL not set — nothing to ping; skipping."
+            exit 0
+          fi
+          # Best-effort: a single blip must not fail the run (and email noise).
+          # No -f, so an HTTP 4xx/5xx still reports its code; only a connection
+          # failure trips `|| true`, leaving code as curl's "000".
+          code=$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' "$URL") || true
+          echo "ping $URL -> HTTP ${code:-000}"
