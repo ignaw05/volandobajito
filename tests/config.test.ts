@@ -18,8 +18,16 @@ describe("parseEnv", () => {
 		expect(config.SUPABASE_URL).toBe("https://example.supabase.co");
 		expect(config.VERIFIER_PROVIDER).toBe("searchapi");
 		expect(config.MAX_VERIFICATIONS_PER_RUN).toBe(15);
+		expect(config.FLI_MAX_VERIFICATIONS_PER_RUN).toBe(80);
+		expect(config.FLI_PAUSE_MS).toBe(1500);
 		expect(config.SILENT_MODE).toBe(true);
 		expect(config.AUTO_PUBLISH).toBe(false);
+	});
+
+	it("accepts the fli provider without requiring any paid key", () => {
+		const { SEARCHAPI_KEY: _omitted, ...withoutKey } = validEnv;
+		const config = parseEnv({ ...withoutKey, VERIFIER_PROVIDER: "fli" });
+		expect(config.VERIFIER_PROVIDER).toBe("fli");
 	});
 
 	it("coerces boolean flags and numeric values", () => {

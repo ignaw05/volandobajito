@@ -1,6 +1,10 @@
 import { pathToFileURL } from "node:url";
 import { createDolarClient } from "../clients/dolar.js";
 import {
+	fliDegradationAlert,
+	isFallbackVerifier,
+} from "../clients/fallbackVerifier.js";
+import {
 	createVerifier,
 	type FlightVerifier,
 } from "../clients/flightVerifier.js";
@@ -46,16 +50,27 @@ export interface RecheckDeps {
 		): Promise<Deal>;
 	};
 	verifier: FlightVerifier;
-	/** Hard cap of paid calls for this run (MAX_VERIFICATIONS_PER_RUN). */
+	/**
+	 * Hard cap of PAID calls this run (MAX_VERIFICATIONS_PER_RUN). With a
+	 * paid-only provider it caps total calls; with fli it bounds only the
+	 * SearchApi fallback (free fli calls are uncapped).
+	 */
 	budget: number;
+	/** Pause between provider calls (ms) to avoid hammering fli's source. */
+	pauseMs?: number;
 	/** Edits the original channel post (to prepend the expired banner). */
 	editChannelPost(messageId: number, text: string): Promise<void>;
 	/** ARS-per-USD tarjeta rate, or null for USD-only (banner text only). */
 	getArsRate(): Promise<number | null>;
 	redirectBaseUrl: string;
+	/** Operator alert emitted once when the fli primary degraded/collapsed. */
+	notifyOperator?: (text: string) => Promise<void>;
 	now?: () => number;
 	log?: (line: string) => void;
 }
+
+const sleep = (ms: number): Promise<void> =>
+	new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function runRecheck(deps: RecheckDeps): Promise<RecheckSummary> {
 	const log = deps.log ?? console.log;
@@ -71,6 +86,10 @@ export async function runRecheck(deps: RecheckDeps): Promise<RecheckSummary> {
 		durationMs: 0,
 	};
 
+	const fallback = isFallbackVerifier(deps.verifier) ? deps.verifier : null;
+	const pauseMs = deps.pauseMs ?? 0;
+	let countedPaidCalls = 0;
+
 	const sinceIso = new Date(
 		startedAt - RECHECK_WINDOW_HOURS * 3_600_000,
 	).toISOString();
@@ -79,8 +98,11 @@ export async function runRecheck(deps: RecheckDeps): Promise<RecheckSummary> {
 		`recheck: ${deals.length} published deal(s) in the last ${RECHECK_WINDOW_HOURS}h`,
 	);
 
+	let firstCall = true;
 	for (const deal of deals) {
-		if (summary.paidCalls >= deps.budget) {
+		// Paid-only providers stop at the budget; fli is free, so it rechecks
+		// every deal (its SearchApi fallback is capped inside the verifier).
+		if (!fallback && countedPaidCalls >= deps.budget) {
 			log(
 				`recheck: budget exhausted (${deps.budget}), ${deals.length - summary.processed} deal(s) left unchecked`,
 			);
@@ -89,8 +111,10 @@ export async function runRecheck(deps: RecheckDeps): Promise<RecheckSummary> {
 		const { origin, destination } = deal.routes;
 		const label = `${origin}-${destination} ${deal.depart_date}`;
 		summary.processed += 1;
+		if (!firstCall && pauseMs > 0) await sleep(pauseMs);
+		firstCall = false;
 		try {
-			summary.paidCalls += 1;
+			if (!fallback) countedPaidCalls += 1;
 			const result = await deps.verifier.verify(
 				origin,
 				destination,
@@ -153,7 +177,23 @@ export async function runRecheck(deps: RecheckDeps): Promise<RecheckSummary> {
 		}
 	}
 
+	summary.paidCalls = fallback
+		? fallback.stats.fallbackCalls
+		: countedPaidCalls;
 	summary.durationMs = now() - startedAt;
+	if (fallback) {
+		const alert = fliDegradationAlert(fallback.stats);
+		if (alert !== null) {
+			log(`recheck: ${alert}`);
+			if (deps.notifyOperator) {
+				try {
+					await deps.notifyOperator(alert);
+				} catch (error) {
+					log(`recheck: operator alert failed: ${String(error)}`);
+				}
+			}
+		}
+	}
 	log(
 		`recheck: ${summary.processed} processed, ${summary.alive} alive, ` +
 			`${summary.expired} expired, ${summary.errors} errors, ` +
@@ -178,27 +218,38 @@ async function main(): Promise<void> {
 		"SEARCHAPI_KEY",
 		"FLIGHTAPI_KEY",
 		"MAX_VERIFICATIONS_PER_RUN",
+		"FLI_PAUSE_MS",
 		"TELEGRAM_BOT_TOKEN",
 		"CHANNEL_ID",
+		"CURATOR_CHAT_ID",
 		"REDIRECT_BASE_URL",
 	);
 	const db = createDb(
 		createSupabase(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY),
 	);
-	const verifier = createVerifier(config.VERIFIER_PROVIDER, {
-		...(config.SEARCHAPI_KEY ? { searchApiKey: config.SEARCHAPI_KEY } : {}),
-		...(config.FLIGHTAPI_KEY ? { flightApiKey: config.FLIGHTAPI_KEY } : {}),
-	});
+	const usingFli = config.VERIFIER_PROVIDER === "fli";
+	const verifier = createVerifier(
+		config.VERIFIER_PROVIDER,
+		{
+			...(config.SEARCHAPI_KEY ? { searchApiKey: config.SEARCHAPI_KEY } : {}),
+			...(config.FLIGHTAPI_KEY ? { flightApiKey: config.FLIGHTAPI_KEY } : {}),
+		},
+		{ fallbackBudget: config.MAX_VERIFICATIONS_PER_RUN },
+	);
 	const telegram = createTelegramClient(config.TELEGRAM_BOT_TOKEN);
 	const dolar = createDolarClient();
 	const summary = await runRecheck({
 		db,
 		verifier,
 		budget: config.MAX_VERIFICATIONS_PER_RUN,
+		pauseMs: usingFli ? config.FLI_PAUSE_MS : 0,
 		editChannelPost: (messageId, text) =>
 			telegram.editText(config.CHANNEL_ID, messageId, text),
 		getArsRate: () => dolar.getTarjetaRate(),
 		redirectBaseUrl: config.REDIRECT_BASE_URL,
+		notifyOperator: async (text) => {
+			await telegram.send(config.CURATOR_CHAT_ID, text);
+		},
 	});
 	if (summary.errors > 0 && summary.alive === 0 && summary.expired === 0) {
 		process.exit(1);

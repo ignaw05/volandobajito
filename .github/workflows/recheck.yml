@@ -28,11 +28,13 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          VERIFIER_PROVIDER: ${{ secrets.VERIFIER_PROVIDER || 'searchapi' }}
+          VERIFIER_PROVIDER: ${{ secrets.VERIFIER_PROVIDER || 'fli' }}
           SEARCHAPI_KEY: ${{ secrets.SEARCHAPI_KEY }}
           FLIGHTAPI_KEY: ${{ secrets.FLIGHTAPI_KEY }}
           MAX_VERIFICATIONS_PER_RUN: ${{ secrets.MAX_VERIFICATIONS_PER_RUN || '2' }}
+          FLI_PAUSE_MS: ${{ secrets.FLI_PAUSE_MS || '1500' }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+          CURATOR_CHAT_ID: ${{ secrets.CURATOR_CHAT_ID }}
           REDIRECT_BASE_URL: ${{ secrets.REDIRECT_BASE_URL }}
           SILENT_MODE: ${{ secrets.SILENT_MODE || 'true' }}
