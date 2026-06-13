@@ -124,7 +124,7 @@ Para volver a SearchApi puro: secret `VERIFIER_PROVIDER=searchapi`.
 
 Dos workflows de GitHub Actions, ambos en el grupo de concurrencia `pipeline` (`cancel-in-progress: false`): nunca corren dos a la vez porque comparten el proveedor de verificación y su presupuesto de llamadas pagas.
 
-- **`scan.yml`** (`pipeline` en la UI de Actions) — cron cada 8 h: `npm run pipeline` = scan → detect → verify. Con `SILENT_MODE=true` (default) verify se saltea y la corrida no gasta llamadas pagas. Cada corrida cierra con el resumen del embudo de las últimas 24 h (candidatos / verificados / publicados / clicks); cada etapa ya loguea el suyo (observaciones, candidatos, llamadas pagas usadas/presupuesto).
+- **`scan.yml`** (`pipeline` en la UI de Actions) — cron cada 4 h: `npm run pipeline` = scan → detect → verify. Con `SILENT_MODE=true` (default) verify se saltea y la corrida no gasta llamadas pagas. Cada corrida cierra con el resumen del embudo de las últimas 24 h (candidatos / verificados / publicados / clicks); cada etapa ya loguea el suyo (observaciones, candidatos, llamadas pagas usadas/presupuesto).
 - **`recheck.yml`** — cron cada 12 h: `npm run recheck`. No-op mientras `SILENT_MODE=true`.
 
 Secrets del repo (Settings → Secrets and variables → Actions): las env vars de `.env.example`. Para arrancar en modo silencioso alcanza con `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y `TRAVELPAYOUTS_TOKEN` — el resto solo se valida cuando `SILENT_MODE=false`. Los knobs no sensibles tienen default inline en el workflow (`SILENT_MODE` → `true`, `MAX_VERIFICATIONS_PER_RUN` → `2`, `VERIFIER_PROVIDER` → `searchapi`).
